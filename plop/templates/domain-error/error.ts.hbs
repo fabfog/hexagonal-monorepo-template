@@ -1,0 +1,13 @@
+import { DomainError } from '@domain/core';
+
+export class {{pascalCase errorName}}Error extends DomainError {
+  constructor() {
+    super({
+      code: '{{constantCase errorName}}',
+      message: '{{sentenceCase errorName}}',
+      metadata: {},
+      cause: undefined,
+    });
+  }
+}
+

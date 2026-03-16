@@ -1,0 +1,26 @@
+import { z } from 'zod';
+
+export const {{pascalCase valueObjectName}}Schema = z.object({
+  // TODO: add fields
+});
+
+export type {{pascalCase valueObjectName}}Props = z.infer<
+  typeof {{pascalCase valueObjectName}}Schema
+>;
+
+export class {{pascalCase valueObjectName}}ValueObject {
+  private readonly props: {{pascalCase valueObjectName}}Props;
+
+  constructor(props: {{pascalCase valueObjectName}}Props) {
+    this.props = {{pascalCase valueObjectName}}Schema.parse(props);
+  }
+
+  getProps(): Readonly<{{pascalCase valueObjectName}}Props> {
+    return this.props;
+  }
+
+  equals(other: {{pascalCase valueObjectName}}ValueObject): boolean {
+    throw new Error('Method not implemented.');
+  }
+}
+

@@ -1,0 +1,38 @@
+{
+  "name": "hexagonal-monorepo-template",
+  "private": true,
+  "scripts": {
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "plop": "plop --plopfile plop/plopfile.cjs",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:watch": "vitest --watch",
+    "test:coverage": "vitest run --coverage",
+    "prepare": "husky install"
+  },
+  "devDependencies": {
+    "@repo/config-eslint": "workspace:^",
+    "@repo/config-vitest": "workspace:^",
+    "@vitest/coverage-v8": "^4.1.0",
+    "eslint-config-prettier": "^10.1.8",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
+    "plop": "^4.0.5",
+    "prettier": "^3.4.2",
+    "vitest": "^4.1.0"
+  },
+  "lint-staged": {
+    "*.{js,cjs,mjs,ts,tsx}": [
+      "eslint --fix"
+    ],
+    "*.{js,cjs,mjs,ts,tsx,json,md,yml,yaml}": [
+      "prettier --write"
+    ]
+  },
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,0 +1,11 @@
+import type { {{pascalCase entityName}}Entity } from '@domain/{{packageName}}';
+import type { {{pascalCase entityName}}DTO } from '../dtos/{{kebabCase entityName}}.dto';
+
+export function map{{pascalCase entityName}}ToDTO(
+  entity: {{pascalCase entityName}}Entity
+): {{pascalCase entityName}}DTO {
+  const props = entity.getProps();
+  // TODO: map from props to DTO
+  return {};
+}
+

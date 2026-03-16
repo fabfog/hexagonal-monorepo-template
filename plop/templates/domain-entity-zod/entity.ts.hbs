@@ -1,0 +1,22 @@
+import { z } from 'zod';
+
+export const {{pascalCase entityName}}Schema = z.object({
+  // TODO: add fields
+});
+
+export type {{pascalCase entityName}}Props = z.infer<
+  typeof {{pascalCase entityName}}Schema
+>;
+
+export class {{pascalCase entityName}}Entity {
+  private props: {{pascalCase entityName}}Props;
+
+  constructor(props: {{pascalCase entityName}}Props) {
+    this.props = {{pascalCase entityName}}Schema.parse(props);
+  }
+
+  getProps(): Readonly<{{pascalCase entityName}}Props> {
+    return this.props;
+  }
+}
+
