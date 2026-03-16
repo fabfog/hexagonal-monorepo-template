@@ -54,7 +54,9 @@ This is where packages with **domain / application / infrastructure code** live,
 
 - **`packages/composition/*`**
   - Example: `packages/composition/web` (`@composition/web`)
-  - Composition packages wire together domain, application, and infrastructure for a given app or surface.
+  - **Purpose**: Composition packages are the **dependency-injection / wiring layer** for one or more apps or surfaces. They:
+    - Instantiate use cases, flows, and infrastructure adapters and expose them as a single `dependencies` object (optionally grouped by feature, with lazy loading).
+    - Act as the only place that knows how to assemble domain, application, and infrastructure; apps then depend only on composition (and application DTOs), not on use cases or flows directly.
   - They have a single entry point (`src/index.ts`) and may import from domain, application, and infrastructure.
   - They must _not_ import from `apps/*`.
 
@@ -125,7 +127,7 @@ Thanks to the root `eslint.config.js`, you don’t need a separate ESLint config
 
 ## Code generators (Plop)
 
-This repo uses [Plop](https://plopjs.com) to generate domain, application, and infrastructure artifacts following the hexagonal conventions.
+This repo uses [Plop](https://plopjs.com) to generate domain, application, infrastructure, and composition artifacts following the hexagonal conventions.
 
 - **How to run**
 
@@ -133,22 +135,25 @@ This repo uses [Plop](https://plopjs.com) to generate domain, application, and i
   pnpm plop --plopfile plop/plopfile.cjs
   ```
 
-- **Available generators (high level)**:
-  - **Domain packages / building blocks**
-    - `domain-package`: create a new `@domain/<name>` package with `entities`, `value-objects`, `errors`, `services` structure.
-    - `domain-entity-zod`: add an Entity (Zod schema + type + class in a single file) to an existing domain package and export it from the barrel.
-    - `domain-value-object-zod`: add a Value Object (Zod schema + type + class with `equals` method) to an existing domain package.
-    - `domain-error`: add a `DomainError` subclass (extending `@domain/core`) to a domain package (including `core`) and export it.
-  - **Application layer**
-    - `application-package`: create a new `@application/<name>` package with `ports`, `use-cases`, `flows`, `dtos`, `mappers` and proper `exports`.
-    - `application-use-case`: add a new `XxxUseCase` class to an existing application package and export it from `use-cases/index.ts`.
-    - `application-port`: add a new port interface (empty contract) under `src/ports` and export it from `ports/index.ts`.
-    - `application-flow`: add a new `XxxFlow` plus its `XxxInteractionPort` in the same application package and export both from their barrels.
-    - `domain-entity-dto-mapper`: given a domain Entity, create the corresponding application package (if missing), DTO and mapper + barrel exports.
-  - **Infrastructure**
-    - `infrastructure-driven-adapter`: create a new `@infrastructure/driven-<name>` package under `packages/infrastructure` with `package.json`, `tsconfig.json` and `src/index.ts`.
-  - **Composition**
-    - `composition-package`: create a new `@composition/<name>` package under `packages/composition` with a single entry point `src/index.ts` (can import from domain, application, infrastructure; cannot import from apps).
-    - `composition-feature-dependencies`: add a feature (e.g. DocumentEditor) to a composition package: creates a factory `createXxxDependencies()` in `src/<feature-kebab>/dependencies.ts` and registers it in `src/index.ts` under `dependencies.<featureCamel>` with lazy loading (getter with cache).
+- **Available generators** (match the names in the Plop menu):
+
+  | Generator                          | Purpose                                                                                                                                                                                                                                                |
+  | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+  | **Domain**                         |                                                                                                                                                                                                                                                        |
+  | `domain-package`                   | Create a new `@domain/<name>` package with `entities`, `value-objects`, `errors`, `services` structure.                                                                                                                                                |
+  | `domain-entity-zod`                | Add an Entity (Zod schema + type + class in one file) to an existing domain package; updates entities barrel.                                                                                                                                          |
+  | `domain-value-object-zod`          | Add a Value Object (Zod schema + type + class with `equals`) to an existing domain package; updates value-objects barrel.                                                                                                                              |
+  | `domain-error`                     | Add a `DomainError` subclass to a domain package (including `core`); updates errors barrel.                                                                                                                                                            |
+  | **Application**                    |                                                                                                                                                                                                                                                        |
+  | `application-package`              | Create a new `@application/<name>` package with `ports`, `use-cases`, `flows`, `dtos`, `mappers` and exports.                                                                                                                                          |
+  | `application-use-case`             | Add a `XxxUseCase` class to an existing application package (excludes `core`); updates use-cases barrel.                                                                                                                                               |
+  | `application-port`                 | Add a port interface to an existing application package (excludes `core`); updates ports barrel.                                                                                                                                                       |
+  | `application-flow`                 | Add a `XxxFlow` and its `XxxInteractionPort` to an application package; updates flows and ports barrels.                                                                                                                                               |
+  | `domain-entity-dto-mapper`         | Given a domain entity, create DTO + mapper in the matching application package (creates the app package if missing); updates dtos/mappers barrels and adds `@domain/<pkg>` dependency.                                                                 |
+  | **Infrastructure**                 |                                                                                                                                                                                                                                                        |
+  | `infrastructure-driven-adapter`    | Create a new `@infrastructure/driven-<name>` package under `packages/infrastructure` with `package.json`, `tsconfig.json`, and `src/index.ts`.                                                                                                         |
+  | **Composition**                    |                                                                                                                                                                                                                                                        |
+  | `composition-package`              | Create a new `@composition/<name>` package with a single entry point `src/index.ts`.                                                                                                                                                                   |
+  | `composition-feature-dependencies` | Add a feature (e.g. DocumentEditor) to a composition package: creates `createXxxDependencies()` in `src/<feature-kebab>/dependencies.ts` and registers it in `src/index.ts` under `dependencies.<featureCamel>` with lazy loading (getter with cache). |
 
 Generators are intentionally minimal: they create the right folders, barrels, and base classes/interfaces, but leave TODOs where business logic or mapping must be implemented explicitly.
