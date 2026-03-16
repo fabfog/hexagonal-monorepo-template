@@ -4,13 +4,10 @@
   "private": true,
   "description": "Shared TypeScript configuration for the monorepo",
   "exports": {
-    "./base.json": "./base.json",
-    "./node.json": "./node.json",
-    "./package.json": "./package.json"
+    "./base.json": "./base.json"
   },
   "files": [
-    "base.json",
-    "node.json"
+    "base.json"
   ],
   "devDependencies": {
     "typescript": "^5.7.2"
