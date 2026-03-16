@@ -52,6 +52,16 @@ This is where packages with **domain / application / infrastructure code** live,
   - Reusable driving adapters (e.g. HTTP controllers, CLI entrypoints, Presentation components that call use cases).
   - Driven adapters (e.g. repositories to DB/CMS, InteractionPort adapters, external clients).
 
+- **`packages/composition/*`**
+  - Example: `packages/composition/web` (`@composition/web`)
+  - Composition packages wire together domain, application, and infrastructure for a given app or surface.
+  - They have a single entry point (`src/index.ts`) and may import from domain, application, and infrastructure.
+  - They must _not_ import from `apps/*`.
+
+- **`apps/*`**
+  - Next.js, Nest, or other runnable apps.
+  - Apps may import only from `@composition/*` and from application DTOs (e.g. `@application/<name>`’s `dtos`). All other layers (domain, use-cases, flows, infrastructure) are forbidden so that composition is the single wiring layer.
+
 Every package in `packages/*` is a pnpm workspace with its own `package.json`, `tsconfig.json`, and `src/`.
 
 ### `configs/` folder
@@ -137,5 +147,8 @@ This repo uses [Plop](https://plopjs.com) to generate domain, application, and i
     - `domain-entity-dto-mapper`: given a domain Entity, create the corresponding application package (if missing), DTO and mapper + barrel exports.
   - **Infrastructure**
     - `infrastructure-driven-adapter`: create a new `@infrastructure/driven-<name>` package under `packages/infrastructure` with `package.json`, `tsconfig.json` and `src/index.ts`.
+  - **Composition**
+    - `composition-package`: create a new `@composition/<name>` package under `packages/composition` with a single entry point `src/index.ts` (can import from domain, application, infrastructure; cannot import from apps).
+    - `composition-feature-dependencies`: add a feature (e.g. DocumentEditor) to a composition package: creates a factory `createXxxDependencies()` in `src/<feature-kebab>/dependencies.ts` and registers it in `src/index.ts` under `dependencies.<featureCamel>` with lazy loading (getter with cache).
 
 Generators are intentionally minimal: they create the right folders, barrels, and base classes/interfaces, but leave TODOs where business logic or mapping must be implemented explicitly.

@@ -1,5 +1,7 @@
 packages:
-  - "packages/domain/*"
-  - "packages/application/*"
-  - "packages/infrastructure/*"
+  - "apps/*"
   - "configs/*"
+  - "packages/application/*"
+  - "packages/composition/*"
+  - "packages/domain/*"
+  - "packages/infrastructure/*"

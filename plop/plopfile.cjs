@@ -1,13 +1,17 @@
 const registerDomainPackageGenerator = require("./generators/domain-package.cjs");
+const registerDomainEntityZodGenerator = require("./generators/domain-entity-zod.cjs");
+const registerDomainValueObjectZodGenerator = require("./generators/domain-value-object-zod.cjs");
+const registerDomainErrorGenerator = require("./generators/domain-error.cjs");
+
 const registerApplicationPackageGenerator = require("./generators/application-package.cjs");
 const registerApplicationUseCaseGenerator = require("./generators/application-use-case.cjs");
 const registerApplicationPortGenerator = require("./generators/application-port.cjs");
 const registerApplicationFlowGenerator = require("./generators/application-flow.cjs");
-const registerInfrastructureDrivenAdapterGenerator = require("./generators/infrastructure-driven-adapter.cjs");
-const registerDomainEntityZodGenerator = require("./generators/domain-entity-zod.cjs");
-const registerDomainValueObjectZodGenerator = require("./generators/domain-value-object-zod.cjs");
 const registerApplicationDtoMapperForEntityGenerator = require("./generators/domain-entity-dto-mapper.cjs");
-const registerDomainErrorGenerator = require("./generators/domain-error.cjs");
+
+const registerInfrastructureDrivenAdapterGenerator = require("./generators/infrastructure-driven-adapter.cjs");
+const registerCompositionPackageGenerator = require("./generators/composition-package.cjs");
+const registerCompositionFeatureDependenciesGenerator = require("./generators/composition-feature-dependencies.cjs");
 
 /** @param {import('plop').NodePlopAPI} plop */
 module.exports = function (plop) {
@@ -21,4 +25,6 @@ module.exports = function (plop) {
   registerApplicationUseCaseGenerator(plop);
   registerApplicationFlowGenerator(plop);
   registerInfrastructureDrivenAdapterGenerator(plop);
+  registerCompositionPackageGenerator(plop);
+  registerCompositionFeatureDependenciesGenerator(plop);
 };

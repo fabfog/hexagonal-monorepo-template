@@ -41,6 +41,10 @@ const config = defineConfig(
           pattern: "packages/domain/**",
         },
         {
+          type: "application-dtos",
+          pattern: "packages/application/**/src/dtos/**",
+        },
+        {
           type: "application-use-cases",
           pattern: "packages/application/**/src/use-cases/**",
         },
@@ -55,6 +59,18 @@ const config = defineConfig(
         {
           type: "infrastructure-driven",
           pattern: "packages/infrastructure/driven-**",
+        },
+        {
+          type: "infrastructure",
+          pattern: "packages/infrastructure/**",
+        },
+        {
+          type: "composition",
+          pattern: "packages/composition/**",
+        },
+        {
+          type: "apps",
+          pattern: "apps/**",
         },
       ],
       "import/resolver": {
@@ -77,13 +93,42 @@ const config = defineConfig(
             {
               from: { type: "domain" },
               disallow: {
-                to: { type: "application" },
+                to: [
+                  { type: "application" },
+                  { type: "infrastructure" },
+                  { type: "apps" },
+                  { type: "composition" },
+                ],
               },
             },
             {
               from: { type: "infrastructure-driven" },
               disallow: {
-                to: [{ type: "application-use-cases" }, { type: "application-flows" }],
+                to: [
+                  { type: "application-use-cases" },
+                  { type: "application-flows" },
+                  { type: "infrastructure" },
+                  { type: "apps" },
+                  { type: "composition" },
+                ],
+              },
+            },
+            {
+              from: { type: "composition" },
+              disallow: {
+                to: { type: "apps" },
+              },
+            },
+            {
+              from: { type: "apps" },
+              disallow: {
+                to: [
+                  { type: "domain" },
+                  { type: "application" },
+                  { type: "application-use-cases" },
+                  { type: "application-flows" },
+                  { type: "infrastructure" },
+                ],
               },
             },
           ],
