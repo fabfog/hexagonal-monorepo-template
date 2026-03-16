@@ -32,7 +32,7 @@ The pnpm workspace is defined in `pnpm-workspace.yaml` and separates:
 
 ### `packages/` folder
 
-This is where packages with **domain / application code** live, not tooling-only packages.
+This is where packages with **domain / application / infrastructure code** live, not tooling-only packages.
 
 - **`packages/domain/*`**
   - Example: `packages/domain/core` (`@domain/core`)
@@ -48,8 +48,8 @@ This is where packages with **domain / application code** live, not tooling-only
   - Should _not_ contain:
     - Infrastructure details (HTTP clients, CMS/DB SDKs, UI state stores), View code.
 
-- **(Future) `packages/infrastructure/*`**
-  - Driving adapters (e.g. HTTP controllers, CLI entrypoints, Presentation components that call use cases).
+- **`packages/infrastructure/*`**
+  - Reusable driving adapters (e.g. HTTP controllers, CLI entrypoints, Presentation components that call use cases).
   - Driven adapters (e.g. repositories to DB/CMS, InteractionPort adapters, external clients).
 
 Every package in `packages/*` is a pnpm workspace with its own `package.json`, `tsconfig.json`, and `src/`.
@@ -84,45 +84,10 @@ Other config packages that can live here in the future:
 
 The global TS configuration lives in `tsconfig.repo.json` and is meant to:
 
-- centralise workspace aliases (e.g. `@domain/core`, `@application/core`)
 - avoid `.js` file extensions in imports
 - allow NestJS or other Node/FE apps to compile package sources directly
 
-Excerpt from `tsconfig.repo.json`:
-
-```json
-{
-  "$schema": "https://json.schemastore.org/tsconfig",
-  "extends": "./configs/config-typescript/base.json",
-  "compilerOptions": {
-    "baseUrl": ".",
-    "paths": {
-      // will be populated with paths for different packages, i.e.
-      "@domain/core": ["packages/domain/core/src"]
-    }
-  },
-  "exclude": ["node_modules", "dist"]
-}
-```
-
-Each package (`@domain/core`, `@application/core`, future apps) defines its own `tsconfig.json` extending `tsconfig.repo.json`:
-
-```json
-{
-  "$schema": "https://json.schemastore.org/tsconfig",
-  "extends": "../../../tsconfig.repo.json",
-  "compilerOptions": {
-    "rootDir": "src",
-    "outDir": "dist"
-  },
-  "include": ["src"]
-}
-```
-
-Thanks to `paths`:
-
-- imports like `import { X } from '@domain/core';` work without `.js`
-- a Nest/FE app extending `tsconfig.repo.json` will also compile domain/application sources.
+Each package defines its own `tsconfig.json` extending `tsconfig.repo.json`:
 
 ---
 
@@ -130,18 +95,10 @@ Thanks to `paths`:
 
 The main ESLint config lives in `configs/config-eslint` and is exposed from the root via `eslint.config.js`:
 
-```js
-// eslint.config.js (root)
-import baseConfig from '@repo/config-eslint';
-
-export default [...baseConfig];
-```
-
 Key aspects of the shared config:
 
 - uses `@eslint/js` + `typescript-eslint` (flat config)
-- defines architectural layers
-- uses the TS resolver pointing to the root `tsconfig.repo.json`, so aliases like `@domain/core` / `@application/core` are understood by the boundaries plugin.
+- defines architectural layers via `eslint-plugin-boundaries`
 
 ### Lint scripts
 
@@ -153,3 +110,32 @@ Key aspects of the shared config:
   - `pnpm -C packages/domain/core lint:fix`
 
 Thanks to the root `eslint.config.js`, you don’t need a separate ESLint config per package unless you need overrides.
+
+---
+
+## Code generators (Plop)
+
+This repo uses [Plop](https://plopjs.com) to generate domain, application, and infrastructure artifacts following the hexagonal conventions.
+
+- **How to run**
+
+  ```bash
+  pnpm plop --plopfile plop/plopfile.cjs
+  ```
+
+- **Available generators (high level)**:
+  - **Domain packages / building blocks**
+    - `domain-package`: create a new `@domain/<name>` package with `entities`, `value-objects`, `errors`, `services` structure.
+    - `domain-entity-zod`: add an Entity (Zod schema + type + class in a single file) to an existing domain package and export it from the barrel.
+    - `domain-value-object-zod`: add a Value Object (Zod schema + type + class with `equals` method) to an existing domain package.
+    - `domain-error`: add a `DomainError` subclass (extending `@domain/core`) to a domain package (including `core`) and export it.
+  - **Application layer**
+    - `application-package`: create a new `@application/<name>` package with `ports`, `use-cases`, `flows`, `dtos`, `mappers` and proper `exports`.
+    - `application-use-case`: add a new `XxxUseCase` class to an existing application package and export it from `use-cases/index.ts`.
+    - `application-port`: add a new port interface (empty contract) under `src/ports` and export it from `ports/index.ts`.
+    - `application-flow`: add a new `XxxFlow` plus its `XxxInteractionPort` in the same application package and export both from their barrels.
+    - `domain-entity-dto-mapper`: given a domain Entity, create the corresponding application package (if missing), DTO and mapper + barrel exports.
+  - **Infrastructure**
+    - `infrastructure-driven-adapter`: create a new `@infrastructure/driven-<name>` package under `packages/infrastructure` with `package.json`, `tsconfig.json` and `src/index.ts`.
+
+Generators are intentionally minimal: they create the right folders, barrels, and base classes/interfaces, but leave TODOs where business logic or mapping must be implemented explicitly.
