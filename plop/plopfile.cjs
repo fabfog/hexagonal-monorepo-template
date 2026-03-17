@@ -11,6 +11,7 @@ const registerApplicationDtoMapperForEntityGenerator = require("./generators/dom
 
 const registerInfrastructureDrivenAdapterGenerator = require("./generators/infrastructure-driven-adapter.cjs");
 const registerInfrastructureLibGenerator = require("./generators/infrastructure-lib.cjs");
+const registerDrivenImmerInteractionAdapterGenerator = require("./generators/driven-immer-interaction-adapter.cjs");
 const registerCompositionPackageGenerator = require("./generators/composition-package.cjs");
 const registerCompositionFeatureDependenciesGenerator = require("./generators/composition-feature-dependencies.cjs");
 
@@ -27,6 +28,7 @@ module.exports = function (plop) {
   registerApplicationFlowGenerator(plop);
   registerInfrastructureDrivenAdapterGenerator(plop);
   registerInfrastructureLibGenerator(plop);
+  registerDrivenImmerInteractionAdapterGenerator(plop);
   registerCompositionPackageGenerator(plop);
   registerCompositionFeatureDependenciesGenerator(plop);
 };
