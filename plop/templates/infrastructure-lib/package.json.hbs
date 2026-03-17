@@ -1,14 +1,10 @@
 {
-  "name": "@application/{{kebabCase packageName}}",
+  "name": "@infrastructure/lib-{{kebabCase name}}",
   "version": "1.0.0",
-  "description": "",
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts",
-    "./ports": "./src/ports/index.ts",
-    "./flows": "./src/flows/index.ts",
-    "./use-cases": "./src/use-cases/index.ts"
+    ".": "./src/index.ts"
   },
   "scripts": {
     "lint": "eslint src",

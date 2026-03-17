@@ -61,6 +61,10 @@ const config = defineConfig(
           pattern: "packages/infrastructure/driven-**",
         },
         {
+          type: "infrastructure-lib",
+          pattern: "packages/infrastructure/lib-**",
+        },
+        {
           type: "infrastructure",
           pattern: "packages/infrastructure/**",
         },
@@ -107,7 +111,19 @@ const config = defineConfig(
                 to: [
                   { type: "application-use-cases" },
                   { type: "application-flows" },
-                  { type: "infrastructure" },
+                  { type: "infrastructure-driven" },
+                  { type: "apps" },
+                  { type: "composition" },
+                ],
+              },
+            },
+            {
+              from: { type: "infrastructure-lib" },
+              disallow: {
+                to: [
+                  { type: "application-use-cases" },
+                  { type: "application-flows" },
+                  { type: "infrastructure-driven" },
                   { type: "apps" },
                   { type: "composition" },
                 ],

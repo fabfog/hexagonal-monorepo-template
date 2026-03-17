@@ -10,6 +10,7 @@ const registerApplicationFlowGenerator = require("./generators/application-flow.
 const registerApplicationDtoMapperForEntityGenerator = require("./generators/domain-entity-dto-mapper.cjs");
 
 const registerInfrastructureDrivenAdapterGenerator = require("./generators/infrastructure-driven-adapter.cjs");
+const registerInfrastructureLibGenerator = require("./generators/infrastructure-lib.cjs");
 const registerCompositionPackageGenerator = require("./generators/composition-package.cjs");
 const registerCompositionFeatureDependenciesGenerator = require("./generators/composition-feature-dependencies.cjs");
 
@@ -25,6 +26,7 @@ module.exports = function (plop) {
   registerApplicationUseCaseGenerator(plop);
   registerApplicationFlowGenerator(plop);
   registerInfrastructureDrivenAdapterGenerator(plop);
+  registerInfrastructureLibGenerator(plop);
   registerCompositionPackageGenerator(plop);
   registerCompositionFeatureDependenciesGenerator(plop);
 };

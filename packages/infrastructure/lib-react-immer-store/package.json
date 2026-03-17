@@ -1,14 +1,11 @@
 {
-  "name": "@application/{{kebabCase packageName}}",
+  "name": "@infrastructure/lib-react-immer-store",
   "version": "1.0.0",
-  "description": "",
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts",
-    "./ports": "./src/ports/index.ts",
-    "./flows": "./src/flows/index.ts",
-    "./use-cases": "./src/use-cases/index.ts"
+    ".": "./src/iso/index.ts",
+    "./clent": "./src/client/index.ts"
   },
   "scripts": {
     "lint": "eslint src",
@@ -16,6 +13,11 @@
     "test": "vitest run"
   },
   "devDependencies": {
+    "@types/react": "^19.2.14",
     "vitest": "^4.1.0"
+  },
+  "dependencies": {
+    "immer": "^11.1.4",
+    "react": "^19.2.4"
   }
 }
