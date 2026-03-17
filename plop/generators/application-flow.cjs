@@ -82,6 +82,13 @@ module.exports = function registerApplicationFlowGenerator(plop) {
         templateFile: "templates/application-flow/flow.ts.hbs",
       });
 
+      // Add flow test file
+      actions.push({
+        type: "add",
+        path: "../packages/application/{{packageName}}/src/flows/{{kebabCase flowName}}.flow.test.ts",
+        templateFile: "templates/application-flow/flow.test.ts.hbs",
+      });
+
       // Update flows barrel
       actions.push({
         type: "modify",

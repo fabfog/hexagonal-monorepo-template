@@ -53,6 +53,13 @@ module.exports = function registerApplicationUseCaseGenerator(plop) {
         templateFile: "templates/application-use-case/use-case.ts.hbs",
       });
 
+      // Add use-case test file
+      actions.push({
+        type: "add",
+        path: "../packages/application/{{packageName}}/src/use-cases/{{kebabCase useCaseName}}.use-case.test.ts",
+        templateFile: "templates/application-use-case/use-case.test.ts.hbs",
+      });
+
       // Update use-cases barrel
       actions.push({
         type: "modify",
