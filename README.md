@@ -51,6 +51,11 @@ This is where packages with **domain / application / infrastructure code** live,
 - **`packages/infrastructure/*`**
   - Reusable driving adapters (e.g. HTTP controllers, CLI entrypoints, Presentation components that call use cases).
   - Driven adapters (e.g. repositories to DB/CMS, InteractionPort adapters, external clients).
+  - Infrastructure libraries (`@infrastructure/lib-*`) reused by other Infrastructure packages (e.g. reactive stores, HTTP clients, logging utilities).
+    - Example: `@infrastructure/lib-react-immer-store`, a small library that provides:
+      - an `ExternalStore<T>` primitive (`createImmerStore`) implemented with Immer (no React dependency) that exposes `getSnapshot`, `getState`, `subscribe`, `update`, and `setState`;
+      - a React hook (`useImmerStore`) that turns any `ExternalStore<T>` into a VAI-friendly view accessor via `useSyncExternalStore`.
+    - In the VAI pattern this sits between **Application** and **Presentation** as a reusable technical detail: InteractionPort adapters in the FE can depend on it to manage state, while Domain/Application remain unaware of React/Immer.
 
 - **`packages/composition/*`**
   - Example: `packages/composition/web` (`@composition/web`)
@@ -152,6 +157,7 @@ This repo uses [Plop](https://plopjs.com) to generate domain, application, infra
   | `domain-entity-dto-mapper`         | Given a domain entity, create DTO + mapper in the matching application package (creates the app package if missing); updates dtos/mappers barrels and adds `@domain/<pkg>` dependency.                                                                 |
   | **Infrastructure**                 |                                                                                                                                                                                                                                                        |
   | `infrastructure-driven-adapter`    | Create a new `@infrastructure/driven-<name>` package under `packages/infrastructure` with `package.json`, `tsconfig.json`, and `src/index.ts`.                                                                                                         |
+  | `infrastructure-lib`               | Create a new `@infrastructure/lib-<name>` package (infrastructure “library” code such as reusable stores or utilities) under `packages/infrastructure` with `package.json`, `tsconfig.json`, and a single entry point `src/index.ts`.                  |
   | **Composition**                    |                                                                                                                                                                                                                                                        |
   | `composition-package`              | Create a new `@composition/<name>` package with a single entry point `src/index.ts`.                                                                                                                                                                   |
   | `composition-feature-dependencies` | Add a feature (e.g. DocumentEditor) to a composition package: creates `createXxxDependencies()` in `src/<feature-kebab>/dependencies.ts` and registers it in `src/index.ts` under `dependencies.<featureCamel>` with lazy loading (getter with cache). |

@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/iso/index.ts",
+    ".": "./src/isomorphic/index.ts",
     "./clent": "./src/client/index.ts"
   },
   "scripts": {
