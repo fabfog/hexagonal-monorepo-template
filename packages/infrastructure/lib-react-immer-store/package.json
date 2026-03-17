@@ -1,5 +1,5 @@
 {
-  "name": "@infrastructure/driven-react-immer-store",
+  "name": "@infrastructure/lib-react-immer-store",
   "version": "1.0.0",
   "private": true,
   "type": "module",

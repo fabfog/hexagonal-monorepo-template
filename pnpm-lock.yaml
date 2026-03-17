@@ -73,7 +73,7 @@ importers:
 
   packages/domain/core: {}
 
-  packages/infrastructure/driven-react-immer-store:
+  packages/infrastructure/lib-react-immer-store:
     dependencies:
       immer:
         specifier: ^11.1.4

@@ -52,7 +52,7 @@ This is where packages with **domain / application / infrastructure code** live,
   - Reusable driving adapters (e.g. HTTP controllers, CLI entrypoints, Presentation components that call use cases).
   - Driven adapters (e.g. repositories to DB/CMS, InteractionPort adapters, external clients).
   - Infrastructure libraries (`@infrastructure/lib-*`) reused by other Infrastructure packages (e.g. reactive stores, HTTP clients, logging utilities).
-    - Example: `@infrastructure/driven-react-immer-store`, a small library that provides:
+    - Example: `@infrastructure/lib-react-immer-store`, a small library that provides:
       - an `ExternalStore<T>` primitive (`createImmerStore`) implemented with Immer (no React dependency) that exposes `getSnapshot`, `getState`, `subscribe`, `update`, and `setState`;
       - a React hook (`useImmerStore`) that turns any `ExternalStore<T>` into a VAI-friendly view accessor via `useSyncExternalStore`.
     - In the VAI pattern this sits between **Application** and **Presentation** as a reusable technical detail: InteractionPort adapters in the FE can depend on it to manage state, while Domain/Application remain unaware of React/Immer.
