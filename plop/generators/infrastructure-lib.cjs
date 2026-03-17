@@ -7,7 +7,7 @@ module.exports = function registerInfrastructureLibGenerator(plop) {
       {
         type: "input",
         name: "name",
-        message: "Infrastructure lib name (e.g. http, react-store):",
+        message: "Infrastructure lib name (e.g. http):",
       },
     ],
     actions: () => {
