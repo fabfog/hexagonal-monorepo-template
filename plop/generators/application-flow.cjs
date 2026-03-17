@@ -37,7 +37,8 @@ module.exports = function registerApplicationFlowGenerator(plop) {
       {
         type: "input",
         name: "flowName",
-        message: "Flow name (e.g. UpdateUser, PublishPage):",
+        message:
+          "Flow base name (e.g. UpdateUser, PublishPage). Do not include Flow in the name, it will be added automatically:",
       },
     ],
     actions: (data) => {

@@ -36,7 +36,8 @@ module.exports = function registerApplicationUseCaseGenerator(plop) {
       {
         type: "input",
         name: "useCaseName",
-        message: "Use case name (e.g. CreatePage, UpdateUserProfile):",
+        message:
+          "Use case base name (e.g. CreatePage, UpdateUserProfile). Do not include UseCase in the name, it will be added automatically:",
       },
     ],
     actions: (data) => {

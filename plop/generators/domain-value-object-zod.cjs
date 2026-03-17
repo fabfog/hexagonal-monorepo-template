@@ -52,7 +52,8 @@ module.exports = function registerDomainValueObjectZodGenerator(plop) {
       {
         type: "input",
         name: "valueObjectName",
-        message: "Value Object name (e.g. UserId, EmailAddress):",
+        message:
+          "Value Object base name (e.g. UserId, EmailAddress). Do not include ValueObject in the name, it will be added automatically:",
       },
     ],
     actions: (data) => {
