@@ -1,9 +1,16 @@
 import { describe, it, expect } from 'vitest';
-import { {{pascalCase useCaseName}}UseCase } from './{{kebabCase useCaseName}}.use-case';
+import { 
+  {{pascalCase useCaseName}}UseCase, 
+  type {{pascalCase useCaseName}}UseCaseDependencies,
+} from './{{kebabCase useCaseName}}.use-case';
+
+const deps: {{pascalCase useCaseName}}UseCaseDependencies = {
+
+}
 
 describe('{{pascalCase useCaseName}}UseCase', () => {
   it('can be instantiated', () => {
-    const useCase = new {{pascalCase useCaseName}}UseCase();
+    const useCase = new {{pascalCase useCaseName}}UseCase(deps);
     expect(useCase).toBeInstanceOf({{pascalCase useCaseName}}UseCase);
   });
 });

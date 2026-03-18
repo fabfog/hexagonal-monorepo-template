@@ -44,7 +44,7 @@ module.exports = function registerApplicationFlowGenerator(plop) {
     actions: (data) => {
       const { flowName } = data;
       const flowKebab = toKebabCase(flowName);
-      const interactionName = `${flowName}Interaction`;
+      const interactionName = `${flowName}InteractionPort`;
       const interactionKebab = toKebabCase(interactionName);
 
       /** @type {import('plop').ActionType[]} */

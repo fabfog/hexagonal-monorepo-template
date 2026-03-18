@@ -32,6 +32,16 @@ function getPackageNameChoices() {
     .map((entry) => ({ name: entry.name, value: entry.name }));
 }
 
+function getApplicationPackageChoices() {
+  const appRoot = path.join(repoRoot, "packages", "application");
+  if (!fs.existsSync(appRoot)) return [];
+
+  return fs
+    .readdirSync(appRoot, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && entry.name !== "core")
+    .map((entry) => ({ name: entry.name, value: entry.name }));
+}
+
 function getEntityChoices(packageName) {
   const entitiesDir = path.join(repoRoot, "packages", "domain", packageName, "src", "entities");
 
@@ -88,27 +98,59 @@ module.exports = function registerDomainEntityDtoMapperGenerator(plop) {
           return !fs.existsSync(appPackageDir);
         },
       },
+      {
+        type: "list",
+        name: "targetApplicationPackage",
+        message: "Select another existing application package:",
+        choices: getApplicationPackageChoices(),
+        when: (answers) => {
+          const appPackageDir = path.join(
+            repoRoot,
+            "packages",
+            "application",
+            answers.packageName,
+            "package.json"
+          );
+          const defaultAppMissing = !fs.existsSync(appPackageDir);
+          return defaultAppMissing && answers.autoCreateApplication === false;
+        },
+      },
     ],
     actions: (data) => {
-      const { packageName, entityName, autoCreateApplication } = data;
-      const appPackageJsonPath = path.join(
+      const {
+        packageName: domainPackageName,
+        entityName,
+        autoCreateApplication,
+        targetApplicationPackage,
+      } = data;
+      const entityKebab = toKebabCase(entityName);
+
+      const defaultAppPackageJsonPath = path.join(
         repoRoot,
         "packages",
         "application",
-        packageName,
+        domainPackageName,
         "package.json"
       );
+
+      const defaultAppExists = fs.existsSync(defaultAppPackageJsonPath);
+
+      const applicationPackage = defaultAppExists
+        ? domainPackageName
+        : autoCreateApplication
+          ? domainPackageName
+          : targetApplicationPackage;
+
+      if (!applicationPackage) {
+        throw new Error(
+          `No application package selected. Create @application/${domainPackageName} or choose an existing one.`
+        );
+      }
 
       /** @type {import('plop').ActionType[]} */
       const actions = [];
 
-      if (!fs.existsSync(appPackageJsonPath)) {
-        if (!autoCreateApplication) {
-          throw new Error(
-            `Application package @application/${packageName} does not exist. Create it first or enable auto-create.`
-          );
-        }
-
+      if (!defaultAppExists && autoCreateApplication) {
         // Reuse application-package base actions for skeleton creation
         actions.push(...getApplicationPackageBaseActions("{{kebabCase packageName}}"));
       }
@@ -116,10 +158,10 @@ module.exports = function registerDomainEntityDtoMapperGenerator(plop) {
       // Ensure application package depends on corresponding domain package
       actions.push({
         type: "modify",
-        path: "../packages/application/{{packageName}}/package.json",
+        path: `../packages/application/${applicationPackage}/package.json`,
         transform: (file) => {
           const pkg = JSON.parse(file);
-          const domainDepName = `@domain/${toKebabCase(packageName)}`;
+          const domainDepName = `@domain/${toKebabCase(domainPackageName)}`;
 
           pkg.dependencies = pkg.dependencies || {};
 
@@ -134,23 +176,23 @@ module.exports = function registerDomainEntityDtoMapperGenerator(plop) {
       // DTO file
       actions.push({
         type: "add",
-        path: "../packages/application/{{packageName}}/src/dtos/{{kebabCase entityName}}.dto.ts",
+        path: `../packages/application/${applicationPackage}/src/dtos/${entityKebab}.dto.ts`,
         templateFile: "templates/domain-entity-dto-mapper/dto.ts.hbs",
       });
 
       // Mapper file
       actions.push({
         type: "add",
-        path: "../packages/application/{{packageName}}/src/mappers/{{kebabCase entityName}}.mapper.ts",
+        path: `../packages/application/${applicationPackage}/src/mappers/${entityKebab}.mapper.ts`,
         templateFile: "templates/domain-entity-dto-mapper/mapper.ts.hbs",
       });
 
       // Update dtos barrel
       actions.push({
         type: "modify",
-        path: "../packages/application/{{packageName}}/src/dtos/index.ts",
+        path: `../packages/application/${applicationPackage}/src/dtos/index.ts`,
         transform: (file) => {
-          const kebab = toKebabCase(entityName);
+          const kebab = entityKebab;
           const cleaned = file.replace(/^export\s*{\s*}\s*;?\s*$/m, "").trimEnd();
           const exportLine = `export * from './${kebab}.dto';`;
 
@@ -166,9 +208,9 @@ module.exports = function registerDomainEntityDtoMapperGenerator(plop) {
       // Update mappers barrel
       actions.push({
         type: "modify",
-        path: "../packages/application/{{packageName}}/src/mappers/index.ts",
+        path: `../packages/application/${applicationPackage}/src/mappers/index.ts`,
         transform: (file) => {
-          const kebab = toKebabCase(entityName);
+          const kebab = entityKebab;
           const cleaned = file.replace(/^export\s*{\s*}\s*;?\s*$/m, "").trimEnd();
           const exportLine = `export * from './${kebab}.mapper';`;
 

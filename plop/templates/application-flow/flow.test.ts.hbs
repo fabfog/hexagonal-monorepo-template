@@ -1,12 +1,19 @@
 import { describe, it, expect } from 'vitest';
-import { {{pascalCase flowName}}Flow } from './{{kebabCase flowName}}.flow';
+import {
+  {{pascalCase flowName}}Flow,
+  type {{pascalCase flowName}}FlowDependencies,
+} from './{{kebabCase flowName}}.flow';
 
 // NOTE: interaction port is injected from composition layer, so here we can pass a simple stub
 const interactionPortStub = {};
 
+const deps: {{pascalCase flowName}}FlowDependencies = {
+  interactionPort: interactionPortStub,
+};
+
 describe('{{pascalCase flowName}}Flow', () => {
   it('can be instantiated', () => {
-    const flow = new {{pascalCase flowName}}Flow(interactionPortStub);
+    const flow = new {{pascalCase flowName}}Flow(deps);
     expect(flow).toBeInstanceOf({{pascalCase flowName}}Flow);
   });
 });
