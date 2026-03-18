@@ -1,8 +1,12 @@
 import type { {{pascalCase flowName}}InteractionPort } from '../ports/{{kebabCase flowName}}-interaction.port';
 
+export interface {{pascalCase flowName}}FlowDependencies {
+  interactionPort: {{pascalCase flowName}}InteractionPort;
+}
+
 export class {{pascalCase flowName}}Flow {
   constructor(
-    private readonly interactionPort: {{pascalCase flowName}}InteractionPort
+    private readonly deps: {{pascalCase flowName}}FlowDependencies,
   ) {}
 
   async execute(): Promise<void> {

@@ -1,5 +1,11 @@
+export interface {{pascalCase useCaseName}}UseCaseDependencies {
+
+}
+
 export class {{pascalCase useCaseName}}UseCase {
-  constructor() {}
+  constructor(
+    private readonly deps: {{pascalCase useCaseName}}UseCaseDependencies
+  ) {}
 
   async execute(): Promise<void> {
     // TODO: implement use case

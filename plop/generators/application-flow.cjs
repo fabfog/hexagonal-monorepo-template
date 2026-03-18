@@ -44,7 +44,8 @@ module.exports = function registerApplicationFlowGenerator(plop) {
     actions: (data) => {
       const { flowName } = data;
       const flowKebab = toKebabCase(flowName);
-      const interactionKebab = toKebabCase(`${flowName}Interaction`);
+      const interactionName = `${flowName}Interaction`;
+      const interactionKebab = toKebabCase(interactionName);
 
       /** @type {import('plop').ActionType[]} */
       const actions = [];
@@ -52,10 +53,11 @@ module.exports = function registerApplicationFlowGenerator(plop) {
       // Add interaction port file (interface)
       actions.push({
         type: "add",
-        path: "../packages/application/{{packageName}}/src/ports/{{kebabCase flowName}}-interaction.port.ts",
+        path: "../packages/application/{{packageName}}/src/ports/{{kebabCase flowName}}.interaction.port.ts",
         templateFile: "templates/application-port/port.ts.hbs",
+        skipIfExists: true,
         data: {
-          portName: `${flowName}Interaction`,
+          interfaceName: interactionName,
         },
       });
 
