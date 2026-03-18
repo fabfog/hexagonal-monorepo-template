@@ -16,19 +16,44 @@ const registerCompositionPackageGenerator = require("./generators/composition-pa
 const registerCompositionFeatureDependenciesGenerator = require("./generators/composition-feature-dependencies.cjs");
 
 /** @param {import('plop').NodePlopAPI} plop */
-module.exports = function (plop) {
-  registerDomainPackageGenerator(plop);
-  registerDomainEntityZodGenerator(plop);
-  registerDomainValueObjectZodGenerator(plop);
-  registerDomainErrorGenerator(plop);
-  registerApplicationPackageGenerator(plop);
-  registerApplicationDtoMapperForEntityGenerator(plop);
-  registerApplicationPortGenerator(plop);
-  registerApplicationUseCaseGenerator(plop);
-  registerApplicationFlowGenerator(plop);
-  registerInfrastructureDrivenAdapterGenerator(plop);
-  registerInfrastructureLibGenerator(plop);
-  registerDrivenImmerInteractionAdapterGenerator(plop);
-  registerCompositionPackageGenerator(plop);
-  registerCompositionFeatureDependenciesGenerator(plop);
+module.exports = async function (plop) {
+  const layers = ["Domain", "Application", "Infrastructure", "Composition"];
+
+  const { layer } = await plop.inquirer.prompt([
+    {
+      type: "list",
+      name: "layer",
+      message: "Select generators for layer...",
+      choices: [...layers, "All"],
+      pageSize: 10,
+    },
+  ]);
+
+  const includedLayers = layer === "All" ? layers : [layer];
+
+  if (includedLayers.includes("Domain")) {
+    registerDomainPackageGenerator(plop);
+    registerDomainEntityZodGenerator(plop);
+    registerDomainValueObjectZodGenerator(plop);
+    registerDomainErrorGenerator(plop);
+  }
+
+  if (includedLayers.includes("Application")) {
+    registerApplicationPackageGenerator(plop);
+    registerApplicationDtoMapperForEntityGenerator(plop);
+    registerApplicationPortGenerator(plop);
+    registerApplicationUseCaseGenerator(plop);
+    registerApplicationFlowGenerator(plop);
+  }
+
+  if (includedLayers.includes("Infrastructure")) {
+    registerInfrastructureDrivenAdapterGenerator(plop);
+    registerInfrastructureLibGenerator(plop);
+    registerDrivenImmerInteractionAdapterGenerator(plop);
+  }
+
+  if (includedLayers.includes("Composition")) {
+    registerCompositionPackageGenerator(plop);
+    registerCompositionFeatureDependenciesGenerator(plop);
+  }
 };
