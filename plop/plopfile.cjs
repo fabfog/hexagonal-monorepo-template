@@ -12,12 +12,15 @@ const registerApplicationDtoMapperForEntityGenerator = require("./generators/dom
 const registerInfrastructureDrivenAdapterGenerator = require("./generators/infrastructure-driven-adapter.cjs");
 const registerInfrastructureLibGenerator = require("./generators/infrastructure-lib.cjs");
 const registerDrivenImmerInteractionAdapterGenerator = require("./generators/driven-immer-interaction-adapter.cjs");
+
 const registerCompositionPackageGenerator = require("./generators/composition-package.cjs");
 const registerCompositionFeatureDependenciesGenerator = require("./generators/composition-feature-dependencies.cjs");
 
+const registerPresentationPackageGenerator = require("./generators/presentation-package.cjs");
+
 /** @param {import('plop').NodePlopAPI} plop */
 module.exports = async function (plop) {
-  const layers = ["Domain", "Application", "Infrastructure", "Composition"];
+  const layers = ["Domain", "Application", "Infrastructure", "Composition", "Presentation"];
 
   const { layer } = await plop.inquirer.prompt([
     {
@@ -55,5 +58,9 @@ module.exports = async function (plop) {
   if (includedLayers.includes("Composition")) {
     registerCompositionPackageGenerator(plop);
     registerCompositionFeatureDependenciesGenerator(plop);
+  }
+
+  if (includedLayers.includes("Presentation")) {
+    registerPresentationPackageGenerator(plop);
   }
 };

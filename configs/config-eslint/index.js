@@ -76,6 +76,10 @@ const config = defineConfig(
           type: "apps",
           pattern: "apps/**",
         },
+        {
+          type: "presentation",
+          pattern: "packages/presentation/**",
+        },
       ],
       "import/resolver": {
         typescript: {
@@ -102,6 +106,7 @@ const config = defineConfig(
                   { type: "infrastructure" },
                   { type: "apps" },
                   { type: "composition" },
+                  { type: "presentation" },
                 ],
               },
             },
@@ -114,6 +119,7 @@ const config = defineConfig(
                   { type: "infrastructure-driven" },
                   { type: "apps" },
                   { type: "composition" },
+                  { type: "presentation" },
                 ],
               },
             },
@@ -126,13 +132,14 @@ const config = defineConfig(
                   { type: "infrastructure-driven" },
                   { type: "apps" },
                   { type: "composition" },
+                  { type: "presentation" },
                 ],
               },
             },
             {
               from: { type: "composition" },
               disallow: {
-                to: { type: "apps" },
+                to: [{ type: "apps" }, { type: "presentation" }],
               },
             },
             {
@@ -140,10 +147,20 @@ const config = defineConfig(
               disallow: {
                 to: [
                   { type: "domain" },
-                  { type: "application" },
                   { type: "application-use-cases" },
                   { type: "application-flows" },
                   { type: "infrastructure" },
+                ],
+              },
+            },
+            {
+              from: { type: "presentation" },
+              disallow: {
+                to: [
+                  { type: "application" },
+                  { type: "infrastructure" },
+                  { type: "apps" },
+                  { type: "composition" },
                 ],
               },
             },
