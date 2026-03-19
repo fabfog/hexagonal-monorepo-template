@@ -7,11 +7,12 @@ const registerApplicationPackageGenerator = require("./generators/application-pa
 const registerApplicationUseCaseGenerator = require("./generators/application-use-case.cjs");
 const registerApplicationPortGenerator = require("./generators/application-port.cjs");
 const registerApplicationFlowGenerator = require("./generators/application-flow.cjs");
-const registerApplicationDtoMapperForEntityGenerator = require("./generators/domain-entity-dto-mapper.cjs");
+const registerApplicationDtoMapperForEntityGenerator = require("./generators/application-dto-mapper-for-entity.cjs");
 
 const registerInfrastructureDrivenAdapterGenerator = require("./generators/infrastructure-driven-adapter.cjs");
 const registerInfrastructureLibGenerator = require("./generators/infrastructure-lib.cjs");
 const registerDrivenImmerInteractionAdapterGenerator = require("./generators/driven-immer-interaction-adapter.cjs");
+const registerDrivenPortAdapterGenerator = require("./generators/driven-port-adapter.cjs");
 
 const registerCompositionPackageGenerator = require("./generators/composition-package.cjs");
 const registerCompositionFeatureDependenciesGenerator = require("./generators/composition-feature-dependencies.cjs");
@@ -52,6 +53,7 @@ module.exports = async function (plop) {
   if (includedLayers.includes("Infrastructure")) {
     registerInfrastructureDrivenAdapterGenerator(plop);
     registerInfrastructureLibGenerator(plop);
+    registerDrivenPortAdapterGenerator(plop);
     registerDrivenImmerInteractionAdapterGenerator(plop);
   }
 

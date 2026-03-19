@@ -177,14 +177,14 @@ module.exports = function registerDomainEntityDtoMapperGenerator(plop) {
       actions.push({
         type: "add",
         path: `../packages/application/${applicationPackage}/src/dtos/${entityKebab}.dto.ts`,
-        templateFile: "templates/domain-entity-dto-mapper/dto.ts.hbs",
+        templateFile: "templates/application-dto-mapper-for-entity/dto.ts.hbs",
       });
 
       // Mapper file
       actions.push({
         type: "add",
         path: `../packages/application/${applicationPackage}/src/mappers/${entityKebab}.mapper.ts`,
-        templateFile: "templates/domain-entity-dto-mapper/mapper.ts.hbs",
+        templateFile: "templates/application-dto-mapper-for-entity/mapper.ts.hbs",
       });
 
       // Update dtos barrel
