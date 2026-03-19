@@ -54,6 +54,7 @@ module.exports = function registerDomainEntityZodGenerator(plop) {
         name: "entityName",
         message:
           "Entity base name (e.g. Document, UserProfile). Do not include Entity in the name, it will be added automatically:",
+        validate: (value) => String(value || "").trim().length > 0 || "Name cannot be empty",
       },
     ],
     actions: (data) => {

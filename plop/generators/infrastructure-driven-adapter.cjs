@@ -8,6 +8,7 @@ module.exports = function registerInfrastructureDrivenAdapterGenerator(plop) {
         type: "input",
         name: "name",
         message: "Driven adapter name (e.g. contentful, stripe):",
+        validate: (value) => String(value || "").trim().length > 0 || "Name cannot be empty",
       },
     ],
     actions: () => {

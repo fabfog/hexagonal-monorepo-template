@@ -7,6 +7,7 @@ module.exports = function registerPresentationPackageGenerator(plop) {
         type: "input",
         name: "name",
         message: "UI package name (e.g. editor, document-view):",
+        validate: (value) => String(value || "").trim().length > 0 || "Name cannot be empty",
       },
     ],
     actions: () => [

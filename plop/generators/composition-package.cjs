@@ -8,6 +8,7 @@ module.exports = function registerCompositionPackageGenerator(plop) {
         type: "input",
         name: "name",
         message: "Composition package name (e.g. web, api, shell):",
+        validate: (value) => String(value || "").trim().length > 0 || "Name cannot be empty",
       },
     ],
     actions: () => [

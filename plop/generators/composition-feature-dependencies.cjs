@@ -52,6 +52,7 @@ module.exports = function registerCompositionFeatureDependenciesGenerator(plop) 
         type: "input",
         name: "featureName",
         message: "Feature name (e.g. DocumentEditor, UserProfile):",
+        validate: (value) => String(value || "").trim().length > 0 || "Name cannot be empty",
       },
     ],
     actions: (data) => {

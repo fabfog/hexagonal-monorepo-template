@@ -39,6 +39,7 @@ module.exports = function registerApplicationFlowGenerator(plop) {
         name: "flowName",
         message:
           "Flow base name (e.g. UpdateUser, PublishPage). Do not include Flow in the name, it will be added automatically:",
+        validate: (value) => String(value || "").trim().length > 0 || "Name cannot be empty",
       },
     ],
     actions: (data) => {

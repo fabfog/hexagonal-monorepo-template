@@ -7,6 +7,7 @@ module.exports = function registerDomainPackageGenerator(plop) {
         type: "input",
         name: "name",
         message: "Domain package name (e.g. core, user, document):",
+        validate: (value) => String(value || "").trim().length > 0 || "Name cannot be empty",
       },
     ],
     actions: () => {

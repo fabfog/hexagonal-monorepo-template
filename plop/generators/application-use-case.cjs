@@ -38,6 +38,7 @@ module.exports = function registerApplicationUseCaseGenerator(plop) {
         name: "useCaseName",
         message:
           "Use case base name (e.g. CreatePage, UpdateUserProfile). Do not include UseCase in the name, it will be added automatically:",
+        validate: (value) => String(value || "").trim().length > 0 || "Name cannot be empty",
       },
     ],
     actions: (data) => {

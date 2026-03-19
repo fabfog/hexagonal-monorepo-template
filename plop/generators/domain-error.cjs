@@ -44,6 +44,7 @@ module.exports = function registerDomainErrorGenerator(plop) {
         type: "input",
         name: "errorName",
         message: "Error name (e.g. NotFound, InvalidState):",
+        validate: (value) => String(value || "").trim().length > 0 || "Name cannot be empty",
       },
     ],
     actions: (data) => {

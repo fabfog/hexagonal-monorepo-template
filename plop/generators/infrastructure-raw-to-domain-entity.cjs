@@ -100,6 +100,7 @@ module.exports = function registerInfrastructureRawToDomainEntityGenerator(plop)
         name: "rawName",
         message:
           "Raw data type name (CASE-SENSITIVE: exact casing will be kept in code and only filename is converted to kebab-case):",
+        validate: (value) => String(value || "").trim().length > 0 || "Name cannot be empty",
       },
     ],
     actions: (data) => {

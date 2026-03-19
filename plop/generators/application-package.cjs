@@ -53,6 +53,7 @@ module.exports = function registerApplicationPackageGenerator(plop) {
         type: "input",
         name: "packageName",
         message: "Application package name (e.g. core, editor, billing):",
+        validate: (value) => String(value || "").trim().length > 0 || "Name cannot be empty",
       },
     ],
     actions: () => getApplicationPackageBaseActions("{{kebabCase packageName}}"),

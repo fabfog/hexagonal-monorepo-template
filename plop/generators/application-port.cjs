@@ -45,6 +45,7 @@ module.exports = function registerApplicationPortGenerator(plop) {
         name: "portName",
         message:
           "Port base name (e.g. PageRepository, UserNotification). Do not include Port/InteractionPort in the name, it will be added automatically:",
+        validate: (value) => String(value || "").trim().length > 0 || "Name cannot be empty",
       },
     ],
     actions: (data) => {

@@ -8,6 +8,7 @@ module.exports = function registerInfrastructureLibGenerator(plop) {
         type: "input",
         name: "name",
         message: "Infrastructure lib name (e.g. http):",
+        validate: (value) => String(value || "").trim().length > 0 || "Name cannot be empty",
       },
     ],
     actions: () => {
