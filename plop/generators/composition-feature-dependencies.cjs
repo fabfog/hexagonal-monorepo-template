@@ -136,14 +136,28 @@ ${getterBlock},
             out.splice(dependenciesLineIdx, 0, cacheLine, "");
           }
 
+          const dependenciesStartIdx = out.findIndex((l) =>
+            l.includes("export const dependencies")
+          );
+          if (dependenciesStartIdx < 0) {
+            throw new Error("Could not find dependencies object in composition index.ts");
+          }
+
+          let braceDepth = 0;
           let closingIdx = -1;
-          for (let i = out.length - 1; i >= 0; i--) {
-            if (out[i].trim() === "};") {
+          for (let i = dependenciesStartIdx; i < out.length; i++) {
+            const line = out[i];
+            const opens = (line.match(/\{/g) || []).length;
+            const closes = (line.match(/\}/g) || []).length;
+            braceDepth += opens - closes;
+            if (braceDepth === 0 && i > dependenciesStartIdx) {
               closingIdx = i;
               break;
             }
           }
-          if (closingIdx < 0) closingIdx = out.length;
+          if (closingIdx < 0) {
+            throw new Error("Could not determine closing brace for dependencies object");
+          }
 
           const prevLine = out[closingIdx - 1]?.trim() ?? "";
           if (prevLine.endsWith("}") && !prevLine.endsWith(",")) {

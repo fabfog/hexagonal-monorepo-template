@@ -17,6 +17,7 @@ const registerInfrastructureRawToDomainEntityGenerator = require("./generators/i
 
 const registerCompositionPackageGenerator = require("./generators/composition-package.cjs");
 const registerCompositionFeatureDependenciesGenerator = require("./generators/composition-feature-dependencies.cjs");
+const registerCompositionWireUseCaseGenerator = require("./generators/composition-wire-use-case.cjs");
 
 const registerPresentationPackageGenerator = require("./generators/presentation-package.cjs");
 
@@ -62,6 +63,7 @@ module.exports = async function (plop) {
   if (includedLayers.includes("Composition")) {
     registerCompositionPackageGenerator(plop);
     registerCompositionFeatureDependenciesGenerator(plop);
+    registerCompositionWireUseCaseGenerator(plop);
   }
 
   if (includedLayers.includes("Presentation")) {
