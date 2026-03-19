@@ -61,44 +61,44 @@ function getApplicationPackageChoices() {
     .map((entry) => ({ name: entry.name, value: entry.name }));
 }
 
-function getUseCaseChoices(applicationPackage) {
-  const useCasesDir = path.join(
+function getFlowChoices(applicationPackage) {
+  const flowsDir = path.join(
     repoRoot,
     "packages",
     "application",
     applicationPackage,
     "src",
-    "use-cases"
+    "flows"
   );
 
-  if (!fs.existsSync(useCasesDir)) {
-    throw new Error(`Application package "${applicationPackage}" has no use-cases folder.`);
+  if (!fs.existsSync(flowsDir)) {
+    throw new Error(`Application package "${applicationPackage}" has no flows folder.`);
   }
 
-  const useCases = fs
-    .readdirSync(useCasesDir, { withFileTypes: true })
-    .filter((entry) => entry.isFile() && entry.name.endsWith(".use-case.ts"))
+  const flows = fs
+    .readdirSync(flowsDir, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && entry.name.endsWith(".flow.ts"))
     .map((entry) => {
-      const base = entry.name.replace(/\.use-case\.ts$/, "");
+      const base = entry.name.replace(/\.flow\.ts$/, "");
       const pascal = toPascalCase(base);
       return {
-        name: `${pascal}UseCase (${entry.name})`,
+        name: `${pascal}Flow (${entry.name})`,
         value: pascal,
       };
     });
 
-  if (!useCases.length) {
-    throw new Error(`Application package "${applicationPackage}" has no use-cases.`);
+  if (!flows.length) {
+    throw new Error(`Application package "${applicationPackage}" has no flows.`);
   }
 
-  return useCases;
+  return flows;
 }
 
 /** @param {import('plop').NodePlopAPI} plop */
-module.exports = function registerCompositionWireUseCaseGenerator(plop) {
-  plop.setGenerator("composition-wire-use-case", {
+module.exports = function registerCompositionWireFlowGenerator(plop) {
+  plop.setGenerator("composition-wire-flow", {
     description:
-      "Wire an application use-case into an existing composition feature dependencies factory",
+      "Wire an application flow into an existing composition feature dependencies factory",
     prompts: [
       {
         type: "list",
@@ -120,16 +120,16 @@ module.exports = function registerCompositionWireUseCaseGenerator(plop) {
       },
       {
         type: "list",
-        name: "useCaseName",
-        message: "Select use-case:",
-        choices: (answers) => getUseCaseChoices(answers.applicationPackage),
+        name: "flowName",
+        message: "Select flow:",
+        choices: (answers) => getFlowChoices(answers.applicationPackage),
       },
     ],
     actions: (data) => {
-      const { compositionPackage, featureName, applicationPackage, useCaseName } = data;
-      const useCaseClassName = `${useCaseName}UseCase`;
-      const useCaseVarName = `${toCamelCase(useCaseName)}UseCase`;
-      const importLine = `import { ${useCaseClassName} } from '@application/${applicationPackage}/use-cases';`;
+      const { compositionPackage, featureName, applicationPackage, flowName } = data;
+      const flowClassName = `${flowName}Flow`;
+      const flowVarName = `${toCamelCase(flowName)}Flow`;
+      const importLine = `import { ${flowClassName} } from '@application/${applicationPackage}/flows';`;
       const featureDepsPath = `../packages/composition/${compositionPackage}/src/${featureName}/dependencies.ts`;
 
       /** @type {import('plop').ActionType[]} */
@@ -163,10 +163,10 @@ module.exports = function registerCompositionWireUseCaseGenerator(plop) {
             throw new Error(`Could not find closing "}" of return object in ${featureDepsPath}.`);
           }
 
-          const propertyLine = `    ${useCaseVarName}: () => new ${useCaseClassName}({}),`;
+          const propertyLine = `    ${flowVarName}: () => new ${flowClassName}({}),`;
           const returnBody = updated.slice(returnStart, closing);
 
-          if (!returnBody.includes(`${useCaseVarName}:`)) {
+          if (!returnBody.includes(`${flowVarName}:`)) {
             updated = `${updated.slice(0, closing)}${propertyLine}\n${updated.slice(closing)}`;
           }
 
