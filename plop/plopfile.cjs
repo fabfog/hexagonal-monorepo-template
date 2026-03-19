@@ -13,6 +13,7 @@ const registerInfrastructureDrivenAdapterGenerator = require("./generators/infra
 const registerInfrastructureLibGenerator = require("./generators/infrastructure-lib.cjs");
 const registerDrivenImmerInteractionAdapterGenerator = require("./generators/driven-immer-interaction-adapter.cjs");
 const registerDrivenPortAdapterGenerator = require("./generators/driven-port-adapter.cjs");
+const registerInfrastructureRawToDomainEntityGenerator = require("./generators/infrastructure-raw-to-domain-entity.cjs");
 
 const registerCompositionPackageGenerator = require("./generators/composition-package.cjs");
 const registerCompositionFeatureDependenciesGenerator = require("./generators/composition-feature-dependencies.cjs");
@@ -55,6 +56,7 @@ module.exports = async function (plop) {
     registerInfrastructureLibGenerator(plop);
     registerDrivenPortAdapterGenerator(plop);
     registerDrivenImmerInteractionAdapterGenerator(plop);
+    registerInfrastructureRawToDomainEntityGenerator(plop);
   }
 
   if (includedLayers.includes("Composition")) {
