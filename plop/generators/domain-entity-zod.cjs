@@ -67,6 +67,11 @@ module.exports = function registerDomainEntityZodGenerator(plop) {
           templateFile: "templates/domain-entity-zod/entity.ts.hbs",
         },
         {
+          type: "add",
+          path: "../packages/domain/{{domainPackage}}/src/entities/{{kebabCase entityName}}.entity.test.ts",
+          templateFile: "templates/domain-entity-zod/entity.test.ts.hbs",
+        },
+        {
           type: "modify",
           path: "../packages/domain/{{domainPackage}}/src/entities/index.ts",
           transform: (file) => {

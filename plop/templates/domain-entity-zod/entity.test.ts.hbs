@@ -1,0 +1,9 @@
+import { describe, expect, it } from 'vitest';
+import { {{pascalCase entityName}}Entity } from './{{kebabCase entityName}}.entity';
+
+describe('{{pascalCase entityName}}Entity', () => {
+  it('can be instantiated with valid props', () => {
+    const entity = new {{pascalCase entityName}}Entity({});
+    expect(entity).toBeInstanceOf({{pascalCase entityName}}Entity);
+  });
+});
