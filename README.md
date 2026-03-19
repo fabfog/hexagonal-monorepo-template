@@ -4,7 +4,7 @@ pnpm-based monorepo designed for a hexagonal architecture (Domain / Application 
 
 ### Requirements
 
-- Node.js >= 20
+- Node.js >=22, <23
 - pnpm 9.x
 
 ### Setup
