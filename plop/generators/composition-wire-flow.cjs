@@ -1,86 +1,13 @@
-const fs = require("fs");
-const path = require("path");
-const { getRepoRoot, toPascalCase, lowerFirst } = require("../lib");
+const {
+  getRepoRoot,
+  lowerFirst,
+  getCompositionPackageChoices,
+  getCompositionFeatureChoices,
+  getApplicationPackageChoices,
+  getApplicationFlowChoices,
+} = require("../lib");
 
 const repoRoot = getRepoRoot();
-
-function getCompositionPackageChoices() {
-  const compositionRoot = path.join(repoRoot, "packages", "composition");
-  if (!fs.existsSync(compositionRoot)) {
-    return [];
-  }
-
-  return fs
-    .readdirSync(compositionRoot, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => ({ name: entry.name, value: entry.name }));
-}
-
-function getFeatureChoices(compositionPackage) {
-  const srcDir = path.join(repoRoot, "packages", "composition", compositionPackage, "src");
-  if (!fs.existsSync(srcDir)) {
-    throw new Error(`Composition package "${compositionPackage}" has no src folder.`);
-  }
-
-  const features = fs
-    .readdirSync(srcDir, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .filter((entry) => fs.existsSync(path.join(srcDir, entry.name, "dependencies.ts")))
-    .map((entry) => ({ name: entry.name, value: entry.name }));
-
-  if (!features.length) {
-    throw new Error(
-      `Composition package "${compositionPackage}" has no features with dependencies.ts. Create one first with "composition-feature-dependencies".`
-    );
-  }
-
-  return features;
-}
-
-function getApplicationPackageChoices() {
-  const appRoot = path.join(repoRoot, "packages", "application");
-  if (!fs.existsSync(appRoot)) {
-    return [];
-  }
-
-  return fs
-    .readdirSync(appRoot, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory() && entry.name !== "core")
-    .map((entry) => ({ name: entry.name, value: entry.name }));
-}
-
-function getFlowChoices(applicationPackage) {
-  const flowsDir = path.join(
-    repoRoot,
-    "packages",
-    "application",
-    applicationPackage,
-    "src",
-    "flows"
-  );
-
-  if (!fs.existsSync(flowsDir)) {
-    throw new Error(`Application package "${applicationPackage}" has no flows folder.`);
-  }
-
-  const flows = fs
-    .readdirSync(flowsDir, { withFileTypes: true })
-    .filter((entry) => entry.isFile() && entry.name.endsWith(".flow.ts"))
-    .map((entry) => {
-      const base = entry.name.replace(/\.flow\.ts$/, "");
-      const pascal = toPascalCase(base);
-      return {
-        name: `${pascal}Flow (${entry.name})`,
-        value: pascal,
-      };
-    });
-
-  if (!flows.length) {
-    throw new Error(`Application package "${applicationPackage}" has no flows.`);
-  }
-
-  return flows;
-}
 
 /** @param {import('plop').NodePlopAPI} plop */
 module.exports = function registerCompositionWireFlowGenerator(plop) {
@@ -92,25 +19,25 @@ module.exports = function registerCompositionWireFlowGenerator(plop) {
         type: "list",
         name: "compositionPackage",
         message: "Select composition package:",
-        choices: getCompositionPackageChoices(),
+        choices: getCompositionPackageChoices(repoRoot),
       },
       {
         type: "list",
         name: "featureName",
         message: "Select feature in composition package:",
-        choices: (answers) => getFeatureChoices(answers.compositionPackage),
+        choices: (answers) => getCompositionFeatureChoices(repoRoot, answers.compositionPackage),
       },
       {
         type: "list",
         name: "applicationPackage",
         message: "Select application package:",
-        choices: getApplicationPackageChoices(),
+        choices: getApplicationPackageChoices(repoRoot),
       },
       {
         type: "list",
         name: "flowName",
         message: "Select flow:",
-        choices: (answers) => getFlowChoices(answers.applicationPackage),
+        choices: (answers) => getApplicationFlowChoices(repoRoot, answers.applicationPackage),
       },
     ],
     actions: (data) => {

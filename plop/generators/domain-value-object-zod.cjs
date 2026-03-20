@@ -1,35 +1,11 @@
-const fs = require("fs");
-const path = require("path");
-const { getRepoRoot, toKebabCase } = require("../lib");
+const {
+  getRepoRoot,
+  toKebabCase,
+  getDomainPackageChoices,
+  ensureZodDependencyInDomainPackage,
+} = require("../lib");
 
 const repoRoot = getRepoRoot();
-
-function getDomainPackageChoices() {
-  const domainRoot = path.join(repoRoot, "packages", "domain");
-  if (!fs.existsSync(domainRoot)) return [];
-
-  return fs
-    .readdirSync(domainRoot, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory() && entry.name !== "core")
-    .map((entry) => ({
-      name: entry.name,
-      value: entry.name,
-    }));
-}
-
-function ensureZodDependency(domainPackageName) {
-  const pkgPath = path.join(repoRoot, "packages", "domain", domainPackageName, "package.json");
-  if (!fs.existsSync(pkgPath)) return "package.json not found, skipped zod dependency";
-
-  const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
-  pkg.dependencies = pkg.dependencies || {};
-  if (!pkg.dependencies.zod) {
-    pkg.dependencies.zod = "^3.23.8";
-    fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\n", "utf8");
-    return "Added zod dependency to domain package";
-  }
-  return "zod already present in domain package dependencies";
-}
 
 /** @param {import('plop').NodePlopAPI} plop */
 module.exports = function registerDomainValueObjectZodGenerator(plop) {
@@ -40,7 +16,7 @@ module.exports = function registerDomainValueObjectZodGenerator(plop) {
         type: "list",
         name: "domainPackage",
         message: "Select domain package:",
-        choices: getDomainPackageChoices(),
+        choices: getDomainPackageChoices(repoRoot),
       },
       {
         type: "input",
@@ -75,7 +51,7 @@ module.exports = function registerDomainValueObjectZodGenerator(plop) {
             return `${base}${exportLine}\n`;
           },
         },
-        () => ensureZodDependency(domainPackage),
+        () => ensureZodDependencyInDomainPackage(repoRoot, domainPackage),
       ];
 
       return actions;

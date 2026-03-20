@@ -1,52 +1,15 @@
-const fs = require("fs");
-const path = require("path");
-const { getRepoRoot, toKebabCase, toPascalCase, parseInterfaceMethods } = require("../lib");
+const {
+  getRepoRoot,
+  toKebabCase,
+  toPascalCase,
+  parseInterfaceMethods,
+  getApplicationPackageChoices,
+  getInteractionPortChoices,
+  getDrivenInfrastructurePackageChoices,
+  readApplicationPortSource,
+} = require("../lib");
 
 const repoRoot = getRepoRoot();
-
-function getApplicationPackageChoices() {
-  const appRoot = path.join(repoRoot, "packages", "application");
-  if (!fs.existsSync(appRoot)) {
-    return [];
-  }
-
-  return fs
-    .readdirSync(appRoot, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory() && entry.name !== "core")
-    .map((entry) => ({ name: entry.name, value: entry.name }));
-}
-
-function getInteractionPorts(appPackage) {
-  const portsDir = path.join(repoRoot, "packages", "application", appPackage, "src", "ports");
-  if (!fs.existsSync(portsDir)) {
-    return [];
-  }
-
-  return fs
-    .readdirSync(portsDir, { withFileTypes: true })
-    .filter((entry) => entry.isFile() && entry.name.endsWith(".interaction.port.ts"))
-    .map((entry) => {
-      const base = entry.name.replace(/\.interaction\.port\.ts$/, "");
-      const pascal = toPascalCase(base);
-      const interfaceName = `${pascal}InteractionPort`;
-      return {
-        name: `${interfaceName} (${entry.name})`,
-        value: entry.name,
-      };
-    });
-}
-
-function getDrivenInfrastructureChoices() {
-  const infraRoot = path.join(repoRoot, "packages", "infrastructure");
-  if (!fs.existsSync(infraRoot)) {
-    return [];
-  }
-
-  return fs
-    .readdirSync(infraRoot, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory() && entry.name.startsWith("driven-"))
-    .map((entry) => ({ name: entry.name, value: entry.name }));
-}
 
 /** @param {import('plop').NodePlopAPI} plop */
 module.exports = function registerDrivenImmerInteractionAdapterGenerator(plop) {
@@ -58,14 +21,14 @@ module.exports = function registerDrivenImmerInteractionAdapterGenerator(plop) {
         type: "list",
         name: "applicationPackage",
         message: "Select application package (source InteractionPort):",
-        choices: getApplicationPackageChoices(),
+        choices: getApplicationPackageChoices(repoRoot),
       },
       {
         type: "list",
         name: "portFile",
         message: "Select InteractionPort (from src/ports/*.interaction.port.ts):",
         choices: (answers) => {
-          const ports = getInteractionPorts(answers.applicationPackage);
+          const ports = getInteractionPortChoices(repoRoot, answers.applicationPackage);
           if (!ports.length) {
             throw new Error(
               `No InteractionPort (*.interaction.port.ts) found in application package "${answers.applicationPackage}".`
@@ -78,7 +41,7 @@ module.exports = function registerDrivenImmerInteractionAdapterGenerator(plop) {
         type: "list",
         name: "drivenPackage",
         message: "Select driven-* infrastructure package (target for adapter):",
-        choices: getDrivenInfrastructureChoices(),
+        choices: getDrivenInfrastructurePackageChoices(repoRoot),
       },
       {
         type: "input",
@@ -90,16 +53,7 @@ module.exports = function registerDrivenImmerInteractionAdapterGenerator(plop) {
     actions: (data) => {
       const { applicationPackage, portFile, drivenPackage, adapterBaseName } = data;
 
-      const portsDir = path.join(
-        repoRoot,
-        "packages",
-        "application",
-        applicationPackage,
-        "src",
-        "ports"
-      );
-      const portFilePath = path.join(portsDir, portFile);
-      const portSource = fs.readFileSync(portFilePath, "utf8");
+      const portSource = readApplicationPortSource(repoRoot, applicationPackage, portFile);
 
       const base = portFile.replace(/\.interaction\.port\.ts$/, "");
       const pascalBase = toPascalCase(base);

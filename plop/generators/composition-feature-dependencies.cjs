@@ -1,20 +1,12 @@
-const fs = require("fs");
-const path = require("path");
-const { getRepoRoot, toKebabCase, toPascalCase, toCamelCase } = require("../lib");
+const {
+  getRepoRoot,
+  toKebabCase,
+  toPascalCase,
+  toCamelCase,
+  getCompositionPackageChoices,
+} = require("../lib");
 
 const repoRoot = getRepoRoot();
-
-function getCompositionPackageChoices() {
-  const compositionRoot = path.join(repoRoot, "packages", "composition");
-  if (!fs.existsSync(compositionRoot)) {
-    return [];
-  }
-
-  return fs
-    .readdirSync(compositionRoot, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => ({ name: entry.name, value: entry.name }));
-}
 
 /** @param {import('plop').NodePlopAPI} plop */
 module.exports = function registerCompositionFeatureDependenciesGenerator(plop) {
@@ -26,7 +18,7 @@ module.exports = function registerCompositionFeatureDependenciesGenerator(plop) 
         type: "list",
         name: "packageName",
         message: "Select composition package:",
-        choices: getCompositionPackageChoices(),
+        choices: getCompositionPackageChoices(repoRoot),
       },
       {
         type: "input",

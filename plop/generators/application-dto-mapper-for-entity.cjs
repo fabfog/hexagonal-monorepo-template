@@ -1,52 +1,19 @@
 const fs = require("fs");
-const path = require("path");
-const { getRepoRoot, toKebabCase, toPascalCase } = require("../lib");
+const {
+  getRepoRoot,
+  toKebabCase,
+  getDomainPackageNamesOrThrow,
+  getApplicationPackageChoices,
+  getDomainEntityChoices,
+  packageJsonPath,
+  toPlopChoices,
+} = require("../lib");
 const { getApplicationPackageBaseActions } = require("./application-package.cjs");
 
 const repoRoot = getRepoRoot();
 
 function getPackageNameChoices() {
-  const domainRoot = path.join(repoRoot, "packages", "domain");
-  if (!fs.existsSync(domainRoot)) {
-    throw new Error(`Domain packages folder is empty or missing. Expected path: ${domainRoot}`);
-  }
-
-  return fs
-    .readdirSync(domainRoot, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory() && entry.name !== "core")
-    .map((entry) => ({ name: entry.name, value: entry.name }));
-}
-
-function getApplicationPackageChoices() {
-  const appRoot = path.join(repoRoot, "packages", "application");
-  if (!fs.existsSync(appRoot)) return [];
-
-  return fs
-    .readdirSync(appRoot, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory() && entry.name !== "core")
-    .map((entry) => ({ name: entry.name, value: entry.name }));
-}
-
-function getEntityChoices(packageName) {
-  const entitiesDir = path.join(repoRoot, "packages", "domain", packageName, "src", "entities");
-
-  if (!fs.existsSync(entitiesDir)) {
-    throw new Error(
-      `Domain package "${packageName}" has no entities folder. Expected path: ${entitiesDir}`
-    );
-  }
-
-  return fs
-    .readdirSync(entitiesDir, { withFileTypes: true })
-    .filter((entry) => entry.isFile() && entry.name.endsWith(".entity.ts"))
-    .map((entry) => {
-      const base = entry.name.replace(/\.entity\.ts$/, "");
-      const pascal = toPascalCase(base);
-      return {
-        name: `${pascal}Entity (${entry.name})`,
-        value: pascal,
-      };
-    });
+  return toPlopChoices(getDomainPackageNamesOrThrow(repoRoot));
 }
 
 /** @param {import('plop').NodePlopAPI} plop */
@@ -65,38 +32,25 @@ module.exports = function registerDomainEntityDtoMapperGenerator(plop) {
         type: "list",
         name: "entityName",
         message: "Select entity:",
-        choices: (answers) => getEntityChoices(answers.packageName),
+        choices: (answers) => getDomainEntityChoices(repoRoot, answers.packageName),
       },
       {
         type: "confirm",
         name: "autoCreateApplication",
         message: "No matching application package found. Create @application/<name> if needed?",
         default: true,
-        when: (answers) => {
-          const appPackageDir = path.join(
-            repoRoot,
-            "packages",
-            "application",
-            answers.packageName,
-            "package.json"
-          );
-          return !fs.existsSync(appPackageDir);
-        },
+        when: (answers) =>
+          !fs.existsSync(packageJsonPath(repoRoot, "application", answers.packageName)),
       },
       {
         type: "list",
         name: "targetApplicationPackage",
         message: "Select another existing application package:",
-        choices: getApplicationPackageChoices(),
+        choices: getApplicationPackageChoices(repoRoot),
         when: (answers) => {
-          const appPackageDir = path.join(
-            repoRoot,
-            "packages",
-            "application",
-            answers.packageName,
-            "package.json"
+          const defaultAppMissing = !fs.existsSync(
+            packageJsonPath(repoRoot, "application", answers.packageName)
           );
-          const defaultAppMissing = !fs.existsSync(appPackageDir);
           return defaultAppMissing && answers.autoCreateApplication === false;
         },
       },
@@ -110,13 +64,7 @@ module.exports = function registerDomainEntityDtoMapperGenerator(plop) {
       } = data;
       const entityKebab = toKebabCase(entityName);
 
-      const defaultAppPackageJsonPath = path.join(
-        repoRoot,
-        "packages",
-        "application",
-        domainPackageName,
-        "package.json"
-      );
+      const defaultAppPackageJsonPath = packageJsonPath(repoRoot, "application", domainPackageName);
 
       const defaultAppExists = fs.existsSync(defaultAppPackageJsonPath);
 

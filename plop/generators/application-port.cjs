@@ -1,20 +1,6 @@
-const fs = require("fs");
-const path = require("path");
-const { getRepoRoot, toKebabCase } = require("../lib");
+const { getRepoRoot, toKebabCase, getApplicationPackageChoices } = require("../lib");
 
 const repoRoot = getRepoRoot();
-
-function getApplicationPackageChoices() {
-  const appRoot = path.join(repoRoot, "packages", "application");
-  if (!fs.existsSync(appRoot)) {
-    return [];
-  }
-
-  return fs
-    .readdirSync(appRoot, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory() && entry.name !== "core")
-    .map((entry) => ({ name: entry.name, value: entry.name }));
-}
 
 /** @param {import('plop').NodePlopAPI} plop */
 module.exports = function registerApplicationPortGenerator(plop) {
@@ -25,7 +11,7 @@ module.exports = function registerApplicationPortGenerator(plop) {
         type: "list",
         name: "packageName",
         message: "Select application package:",
-        choices: getApplicationPackageChoices(),
+        choices: getApplicationPackageChoices(repoRoot),
       },
       {
         type: "confirm",

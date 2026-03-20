@@ -1,86 +1,13 @@
-const fs = require("fs");
-const path = require("path");
-const { getRepoRoot, toPascalCase, lowerFirst } = require("../lib");
+const {
+  getRepoRoot,
+  lowerFirst,
+  getCompositionPackageChoices,
+  getCompositionFeatureChoices,
+  getApplicationPackageChoices,
+  getApplicationUseCaseChoices,
+} = require("../lib");
 
 const repoRoot = getRepoRoot();
-
-function getCompositionPackageChoices() {
-  const compositionRoot = path.join(repoRoot, "packages", "composition");
-  if (!fs.existsSync(compositionRoot)) {
-    return [];
-  }
-
-  return fs
-    .readdirSync(compositionRoot, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => ({ name: entry.name, value: entry.name }));
-}
-
-function getFeatureChoices(compositionPackage) {
-  const srcDir = path.join(repoRoot, "packages", "composition", compositionPackage, "src");
-  if (!fs.existsSync(srcDir)) {
-    throw new Error(`Composition package "${compositionPackage}" has no src folder.`);
-  }
-
-  const features = fs
-    .readdirSync(srcDir, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .filter((entry) => fs.existsSync(path.join(srcDir, entry.name, "dependencies.ts")))
-    .map((entry) => ({ name: entry.name, value: entry.name }));
-
-  if (!features.length) {
-    throw new Error(
-      `Composition package "${compositionPackage}" has no features with dependencies.ts. Create one first with "composition-feature-dependencies".`
-    );
-  }
-
-  return features;
-}
-
-function getApplicationPackageChoices() {
-  const appRoot = path.join(repoRoot, "packages", "application");
-  if (!fs.existsSync(appRoot)) {
-    return [];
-  }
-
-  return fs
-    .readdirSync(appRoot, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory() && entry.name !== "core")
-    .map((entry) => ({ name: entry.name, value: entry.name }));
-}
-
-function getUseCaseChoices(applicationPackage) {
-  const useCasesDir = path.join(
-    repoRoot,
-    "packages",
-    "application",
-    applicationPackage,
-    "src",
-    "use-cases"
-  );
-
-  if (!fs.existsSync(useCasesDir)) {
-    throw new Error(`Application package "${applicationPackage}" has no use-cases folder.`);
-  }
-
-  const useCases = fs
-    .readdirSync(useCasesDir, { withFileTypes: true })
-    .filter((entry) => entry.isFile() && entry.name.endsWith(".use-case.ts"))
-    .map((entry) => {
-      const base = entry.name.replace(/\.use-case\.ts$/, "");
-      const pascal = toPascalCase(base);
-      return {
-        name: `${pascal}UseCase (${entry.name})`,
-        value: pascal,
-      };
-    });
-
-  if (!useCases.length) {
-    throw new Error(`Application package "${applicationPackage}" has no use-cases.`);
-  }
-
-  return useCases;
-}
 
 /** @param {import('plop').NodePlopAPI} plop */
 module.exports = function registerCompositionWireUseCaseGenerator(plop) {
@@ -92,25 +19,25 @@ module.exports = function registerCompositionWireUseCaseGenerator(plop) {
         type: "list",
         name: "compositionPackage",
         message: "Select composition package:",
-        choices: getCompositionPackageChoices(),
+        choices: getCompositionPackageChoices(repoRoot),
       },
       {
         type: "list",
         name: "featureName",
         message: "Select feature in composition package:",
-        choices: (answers) => getFeatureChoices(answers.compositionPackage),
+        choices: (answers) => getCompositionFeatureChoices(repoRoot, answers.compositionPackage),
       },
       {
         type: "list",
         name: "applicationPackage",
         message: "Select application package:",
-        choices: getApplicationPackageChoices(),
+        choices: getApplicationPackageChoices(repoRoot),
       },
       {
         type: "list",
         name: "useCaseName",
         message: "Select use-case:",
-        choices: (answers) => getUseCaseChoices(answers.applicationPackage),
+        choices: (answers) => getApplicationUseCaseChoices(repoRoot, answers.applicationPackage),
       },
     ],
     actions: (data) => {

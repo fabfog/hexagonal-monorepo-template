@@ -1,21 +1,6 @@
-const fs = require("fs");
-const path = require("path");
-const { getRepoRoot, toKebabCase, toConstantCase } = require("../lib");
+const { getRepoRoot, toKebabCase, toConstantCase, getDomainPackageChoices } = require("../lib");
 
 const repoRoot = getRepoRoot();
-
-function getDomainPackageChoices() {
-  const domainRoot = path.join(repoRoot, "packages", "domain");
-  if (!fs.existsSync(domainRoot)) return [];
-
-  return fs
-    .readdirSync(domainRoot, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory()) // include core as well
-    .map((entry) => ({
-      name: entry.name,
-      value: entry.name,
-    }));
-}
 
 /** @param {import('plop').NodePlopAPI} plop */
 module.exports = function registerDomainErrorGenerator(plop) {
@@ -28,7 +13,7 @@ module.exports = function registerDomainErrorGenerator(plop) {
         type: "list",
         name: "domainPackage",
         message: "Select domain package:",
-        choices: getDomainPackageChoices(),
+        choices: getDomainPackageChoices(repoRoot, { excludeCore: false }),
       },
       {
         type: "input",

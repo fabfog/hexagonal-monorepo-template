@@ -1,60 +1,17 @@
-const fs = require("fs");
-const path = require("path");
-const { getRepoRoot, toKebabCase, toPascalCase } = require("../lib");
+const {
+  getRepoRoot,
+  toKebabCase,
+  toPascalCase,
+  getDomainPackageNamesOrThrow,
+  toPlopChoices,
+  getDomainEntityChoices,
+  getInfrastructurePackageChoices,
+} = require("../lib");
 
 const repoRoot = getRepoRoot();
 
 function getDomainPackageChoices() {
-  const domainRoot = path.join(repoRoot, "packages", "domain");
-  if (!fs.existsSync(domainRoot)) {
-    throw new Error(`Domain packages folder is empty or missing. Expected path: ${domainRoot}`);
-  }
-
-  return fs
-    .readdirSync(domainRoot, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => ({ name: entry.name, value: entry.name }));
-}
-
-function getEntityChoices(domainPackage) {
-  const entitiesDir = path.join(repoRoot, "packages", "domain", domainPackage, "src", "entities");
-  if (!fs.existsSync(entitiesDir)) {
-    throw new Error(
-      `Domain package "${domainPackage}" has no entities folder. Expected path: ${entitiesDir}`
-    );
-  }
-
-  const entities = fs
-    .readdirSync(entitiesDir, { withFileTypes: true })
-    .filter((entry) => entry.isFile() && entry.name.endsWith(".entity.ts"))
-    .map((entry) => {
-      const base = entry.name.replace(/\.entity\.ts$/, "");
-      const pascal = toPascalCase(base);
-      return {
-        name: `${pascal}Entity (${entry.name})`,
-        value: pascal,
-      };
-    });
-
-  if (!entities.length) {
-    throw new Error(`Domain package "${domainPackage}" has no entities.`);
-  }
-
-  return entities;
-}
-
-function getInfrastructurePackageChoices() {
-  const infrastructureRoot = path.join(repoRoot, "packages", "infrastructure");
-  if (!fs.existsSync(infrastructureRoot)) {
-    throw new Error(
-      `Infrastructure packages folder is empty or missing. Expected path: ${infrastructureRoot}`
-    );
-  }
-
-  return fs
-    .readdirSync(infrastructureRoot, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => ({ name: entry.name, value: entry.name }));
+  return toPlopChoices(getDomainPackageNamesOrThrow(repoRoot, { excludeCore: false }));
 }
 
 /** @param {import('plop').NodePlopAPI} plop */
@@ -72,13 +29,13 @@ module.exports = function registerInfrastructureRawToDomainEntityGenerator(plop)
         type: "list",
         name: "entityName",
         message: "Select domain entity:",
-        choices: (answers) => getEntityChoices(answers.domainPackage),
+        choices: (answers) => getDomainEntityChoices(repoRoot, answers.domainPackage),
       },
       {
         type: "list",
         name: "infrastructurePackage",
         message: "Select infrastructure package (target):",
-        choices: getInfrastructurePackageChoices(),
+        choices: getInfrastructurePackageChoices(repoRoot),
       },
       {
         type: "input",

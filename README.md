@@ -140,7 +140,7 @@ This repo uses [Plop](https://plopjs.com) to generate domain, application, infra
   pnpm plop
   ```
 
-- **Shared Plop utilities** (`plop/lib/`): CommonJS helpers used by generators (`getRepoRoot`, `toKebabCase`, `toPascalCase`, `toCamelCase`, `lowerFirst`, `toConstantCase`, `parseInterfaceMethods`). Import from `../lib` inside `plop/generators/*.cjs` (resolved via `plop/lib/package.json`).
+- **Shared Plop utilities** (`plop/lib/`): `index.cjs` re-exports **casing** (`plop/lib/casing.cjs`: `toKebabCase`, `toPascalCase`, `toCamelCase`, `lowerFirst`, `toConstantCase`, `parseInterfaceMethods`) and **packages** (`plop/lib/packages.cjs`: listing workspace packages, Plop `choices`, port/entity/flow/use-case discovery, `packageJsonPath`, `readApplicationPortSource`, `ensureZodDependencyInDomainPackage`, etc.). Generators import from `../lib` (resolved via `plop/lib/package.json`).
 
 - **Available generators** (match the names in the Plop menu):
 
