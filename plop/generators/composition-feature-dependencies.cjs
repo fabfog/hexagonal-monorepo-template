@@ -1,28 +1,8 @@
 const fs = require("fs");
 const path = require("path");
+const { getRepoRoot, toKebabCase, toPascalCase, toCamelCase } = require("../lib");
 
-function toKebabCase(value) {
-  return String(value)
-    .trim()
-    .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
-    .replace(/\s+/g, "-")
-    .toLowerCase();
-}
-
-function toPascalCase(value) {
-  return String(value)
-    .trim()
-    .split(/[\s\-_/]+/)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
-    .join("");
-}
-
-function toCamelCase(value) {
-  const pascal = toPascalCase(value);
-  return pascal.charAt(0).toLowerCase() + pascal.slice(1);
-}
-
-const repoRoot = path.join(__dirname, "..", "..");
+const repoRoot = getRepoRoot();
 
 function getCompositionPackageChoices() {
   const compositionRoot = path.join(repoRoot, "packages", "composition");

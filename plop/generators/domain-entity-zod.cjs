@@ -1,16 +1,10 @@
 const fs = require("fs");
 const path = require("path");
+const { getRepoRoot, toKebabCase } = require("../lib");
 
-function toKebabCase(value) {
-  return String(value)
-    .trim()
-    .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
-    .replace(/\s+/g, "-")
-    .toLowerCase();
-}
+const repoRoot = getRepoRoot();
 
 function getDomainPackageChoices() {
-  const repoRoot = path.join(__dirname, "..", "..");
   const domainRoot = path.join(repoRoot, "packages", "domain");
   if (!fs.existsSync(domainRoot)) return [];
 
@@ -24,7 +18,6 @@ function getDomainPackageChoices() {
 }
 
 function ensureZodDependency(domainPackageName) {
-  const repoRoot = path.join(__dirname, "..", "..");
   const pkgPath = path.join(repoRoot, "packages", "domain", domainPackageName, "package.json");
   if (!fs.existsSync(pkgPath)) return "package.json not found, skipped zod dependency";
 

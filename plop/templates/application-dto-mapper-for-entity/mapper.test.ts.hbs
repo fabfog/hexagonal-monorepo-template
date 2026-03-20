@@ -1,0 +1,8 @@
+import { describe, it, expect } from 'vitest';
+import { map{{pascalCase entityName}}ToDTO } from './{{kebabCase entityName}}.mapper';
+
+describe('map{{pascalCase entityName}}ToDTO', () => {
+  it('is defined', () => {
+    expect(map{{pascalCase entityName}}ToDTO).toBeTypeOf('function');
+  });
+});

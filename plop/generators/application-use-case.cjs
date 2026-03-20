@@ -1,16 +1,10 @@
 const fs = require("fs");
 const path = require("path");
+const { getRepoRoot, toKebabCase } = require("../lib");
 
-function toKebabCase(value) {
-  return String(value)
-    .trim()
-    .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
-    .replace(/\s+/g, "-")
-    .toLowerCase();
-}
+const repoRoot = getRepoRoot();
 
 function getApplicationPackageChoices() {
-  const repoRoot = path.join(__dirname, "..", "..");
   const appRoot = path.join(repoRoot, "packages", "application");
   if (!fs.existsSync(appRoot)) {
     return [];

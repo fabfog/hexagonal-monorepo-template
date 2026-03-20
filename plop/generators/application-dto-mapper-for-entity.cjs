@@ -1,24 +1,9 @@
 const fs = require("fs");
 const path = require("path");
+const { getRepoRoot, toKebabCase, toPascalCase } = require("../lib");
 const { getApplicationPackageBaseActions } = require("./application-package.cjs");
 
-function toKebabCase(value) {
-  return String(value)
-    .trim()
-    .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
-    .replace(/\s+/g, "-")
-    .toLowerCase();
-}
-
-function toPascalCase(value) {
-  return String(value)
-    .trim()
-    .split(/[\s\-_/]+/)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
-    .join("");
-}
-
-const repoRoot = path.join(__dirname, "..", "..");
+const repoRoot = getRepoRoot();
 
 function getPackageNameChoices() {
   const domainRoot = path.join(repoRoot, "packages", "domain");
@@ -155,7 +140,7 @@ module.exports = function registerDomainEntityDtoMapperGenerator(plop) {
         actions.push(...getApplicationPackageBaseActions("{{kebabCase packageName}}"));
       }
 
-      // Ensure application package depends on corresponding domain package
+      // Ensure domain dependency + Vitest for mapper tests
       actions.push({
         type: "modify",
         path: `../packages/application/${applicationPackage}/package.json`,
@@ -167,6 +152,15 @@ module.exports = function registerDomainEntityDtoMapperGenerator(plop) {
 
           if (!pkg.dependencies[domainDepName]) {
             pkg.dependencies[domainDepName] = "workspace:*";
+          }
+
+          pkg.devDependencies = pkg.devDependencies || {};
+          if (!pkg.devDependencies.vitest) {
+            pkg.devDependencies.vitest = "^4.1.0";
+          }
+          pkg.scripts = pkg.scripts || {};
+          if (!pkg.scripts.test || String(pkg.scripts.test).includes("No tests yet")) {
+            pkg.scripts.test = "vitest run";
           }
 
           return `${JSON.stringify(pkg, null, 2)}\n`;
@@ -185,6 +179,13 @@ module.exports = function registerDomainEntityDtoMapperGenerator(plop) {
         type: "add",
         path: `../packages/application/${applicationPackage}/src/mappers/${entityKebab}.mapper.ts`,
         templateFile: "templates/application-dto-mapper-for-entity/mapper.ts.hbs",
+      });
+
+      // Mapper test file
+      actions.push({
+        type: "add",
+        path: `../packages/application/${applicationPackage}/src/mappers/${entityKebab}.mapper.test.ts`,
+        templateFile: "templates/application-dto-mapper-for-entity/mapper.test.ts.hbs",
       });
 
       // Update dtos barrel

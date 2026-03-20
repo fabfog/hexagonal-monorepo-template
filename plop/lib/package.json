@@ -1,0 +1,6 @@
+{
+  "name": "@repo/plop-lib",
+  "private": true,
+  "type": "commonjs",
+  "main": "index.cjs"
+}

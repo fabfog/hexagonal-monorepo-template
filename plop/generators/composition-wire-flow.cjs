@@ -1,20 +1,8 @@
 const fs = require("fs");
 const path = require("path");
+const { getRepoRoot, toPascalCase, lowerFirst } = require("../lib");
 
-const repoRoot = path.join(__dirname, "..", "..");
-
-function toPascalCase(value) {
-  return String(value)
-    .trim()
-    .split(/[\s\-_/]+/)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
-    .join("");
-}
-
-function toCamelCase(value) {
-  const pascal = String(value).trim();
-  return pascal.charAt(0).toLowerCase() + pascal.slice(1);
-}
+const repoRoot = getRepoRoot();
 
 function getCompositionPackageChoices() {
   const compositionRoot = path.join(repoRoot, "packages", "composition");
@@ -128,7 +116,7 @@ module.exports = function registerCompositionWireFlowGenerator(plop) {
     actions: (data) => {
       const { compositionPackage, featureName, applicationPackage, flowName } = data;
       const flowClassName = `${flowName}Flow`;
-      const flowVarName = `${toCamelCase(flowName)}Flow`;
+      const flowVarName = `${lowerFirst(flowName)}Flow`;
       const importLine = `import { ${flowClassName} } from '@application/${applicationPackage}/flows';`;
       const featureDepsPath = `../packages/composition/${compositionPackage}/src/${featureName}/dependencies.ts`;
 
