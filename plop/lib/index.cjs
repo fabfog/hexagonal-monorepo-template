@@ -5,19 +5,37 @@ function getRepoRoot() {
   return path.join(__dirname, "..", "..");
 }
 
+/**
+ * Insert spaces at word boundaries so camelCase / PascalCase / "HTTPClient" style names split correctly.
+ * Then callers split on whitespace, hyphens, underscores.
+ */
+function normalizeWordBoundaries(str) {
+  return (
+    String(str)
+      .trim()
+      // fooBar, fooBARx -> split before last capital run when followed by lower (handled by next)
+      .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+      // HTTPClient, XMLParser -> split after acronym before Capital+lower
+      .replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2")
+  );
+}
+
+/** Segments for casing transforms (handles camelCase, PascalCase, kebab, snake, spaces). */
+function splitNameSegments(value) {
+  return normalizeWordBoundaries(value)
+    .split(/[\s\-_/]+/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+}
+
 function toKebabCase(value) {
-  return String(value)
-    .trim()
-    .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
-    .replace(/\s+/g, "-")
-    .toLowerCase();
+  return splitNameSegments(value)
+    .map((part) => part.toLowerCase())
+    .join("-");
 }
 
 function toPascalCase(value) {
-  return String(value)
-    .trim()
-    .split(/[\s\-_/]+/)
-    .filter(Boolean)
+  return splitNameSegments(value)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
     .join("");
 }
