@@ -9,6 +9,15 @@ import tseslint from "typescript-eslint";
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.join(dirname, "..", "..");
 
+/** Domain file kinds (order: specific paths before catch-all `domain`) */
+const domainLayerTypes = [
+  "domain-errors",
+  "domain-value-objects",
+  "domain-entities",
+  "domain-services",
+  "domain",
+];
+
 /** @type {import('eslint').Linter.Config[]} */
 const config = defineConfig(
   eslint.configs.recommended,
@@ -37,6 +46,22 @@ const config = defineConfig(
     settings: {
       "boundaries/elements": [
         {
+          type: "domain-errors",
+          pattern: "packages/domain/**/src/errors/**",
+        },
+        {
+          type: "domain-value-objects",
+          pattern: "packages/domain/**/src/value-objects/**",
+        },
+        {
+          type: "domain-entities",
+          pattern: "packages/domain/**/src/entities/**",
+        },
+        {
+          type: "domain-services",
+          pattern: "packages/domain/**/src/services/**",
+        },
+        {
           type: "domain",
           pattern: "packages/domain/**",
         },
@@ -55,6 +80,10 @@ const config = defineConfig(
         {
           type: "application",
           pattern: "packages/application/**",
+        },
+        {
+          type: "infrastructure-driven-repository",
+          pattern: "packages/infrastructure/driven-repository-**",
         },
         {
           type: "infrastructure-driven",
@@ -98,8 +127,8 @@ const config = defineConfig(
         {
           default: "allow",
           rules: [
-            {
-              from: { type: "domain" },
+            ...domainLayerTypes.map((type) => ({
+              from: { type },
               disallow: {
                 to: [
                   { type: "application" },
@@ -107,6 +136,23 @@ const config = defineConfig(
                   { type: "apps" },
                   { type: "composition" },
                   { type: "presentation" },
+                ],
+              },
+            })),
+            {
+              from: { type: "infrastructure-driven-repository" },
+              disallow: {
+                to: [
+                  { type: "application-use-cases" },
+                  { type: "application-flows" },
+                  { type: "infrastructure-driven" },
+                  { type: "infrastructure-driven-repository" },
+                  { type: "apps" },
+                  { type: "composition" },
+                  { type: "presentation" },
+                  // Repository adapters may import domain entities; not domain services / stray domain files
+                  { type: "domain-services" },
+                  { type: "domain" },
                 ],
               },
             },
@@ -117,9 +163,14 @@ const config = defineConfig(
                   { type: "application-use-cases" },
                   { type: "application-flows" },
                   { type: "infrastructure-driven" },
+                  { type: "infrastructure-driven-repository" },
                   { type: "apps" },
                   { type: "composition" },
                   { type: "presentation" },
+                  // Non-repository driven: domain only via errors + value-objects
+                  { type: "domain-entities" },
+                  { type: "domain-services" },
+                  { type: "domain" },
                 ],
               },
             },
@@ -130,6 +181,7 @@ const config = defineConfig(
                   { type: "application-use-cases" },
                   { type: "application-flows" },
                   { type: "infrastructure-driven" },
+                  { type: "infrastructure-driven-repository" },
                   { type: "apps" },
                   { type: "composition" },
                   { type: "presentation" },
@@ -146,7 +198,7 @@ const config = defineConfig(
               from: { type: "apps" },
               disallow: {
                 to: [
-                  { type: "domain" },
+                  ...domainLayerTypes.map((type) => ({ type })),
                   { type: "application-use-cases" },
                   { type: "application-flows" },
                   { type: "infrastructure" },

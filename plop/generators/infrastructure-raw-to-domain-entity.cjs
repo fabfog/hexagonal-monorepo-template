@@ -57,7 +57,7 @@ module.exports = function registerInfrastructureRawToDomainEntityGenerator(plop)
       actions.push({
         type: "add",
         path: `../packages/infrastructure/${infrastructurePackage}/src/mappers/${mapperFileBase}.mapper.ts`,
-        template: `import { ${entityClassName} } from '@domain/${domainPackage}';
+        template: `import { ${entityClassName} } from '@domain/${domainPackage}/entities';
 
 export function map${rawNamePascal}To${entityClassName}(raw: ${rawName}): ${entityClassName} {
   // TODO: map raw data to ${entityClassName}

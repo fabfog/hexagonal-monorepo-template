@@ -2,6 +2,7 @@ const registerDomainPackageGenerator = require("./generators/domain-package.cjs"
 const registerDomainEntityZodGenerator = require("./generators/domain-entity-zod.cjs");
 const registerDomainValueObjectZodGenerator = require("./generators/domain-value-object-zod.cjs");
 const registerDomainErrorGenerator = require("./generators/domain-error.cjs");
+const registerDomainServiceGenerator = require("./generators/domain-service.cjs");
 
 const registerApplicationPackageGenerator = require("./generators/application-package.cjs");
 const registerApplicationUseCaseGenerator = require("./generators/application-use-case.cjs");
@@ -19,6 +20,7 @@ const registerCompositionPackageGenerator = require("./generators/composition-pa
 const registerCompositionFeatureDependenciesGenerator = require("./generators/composition-feature-dependencies.cjs");
 const registerCompositionWireUseCaseGenerator = require("./generators/composition-wire-use-case.cjs");
 const registerCompositionWireFlowGenerator = require("./generators/composition-wire-flow.cjs");
+const registerCompositionWireInfrastructureGenerator = require("./generators/composition-wire-infrastructure.cjs");
 
 const registerPresentationPackageGenerator = require("./generators/presentation-package.cjs");
 
@@ -43,6 +45,7 @@ module.exports = async function (plop) {
     registerDomainEntityZodGenerator(plop);
     registerDomainValueObjectZodGenerator(plop);
     registerDomainErrorGenerator(plop);
+    registerDomainServiceGenerator(plop);
   }
 
   if (includedLayers.includes("Application")) {
@@ -66,6 +69,7 @@ module.exports = async function (plop) {
     registerCompositionFeatureDependenciesGenerator(plop);
     registerCompositionWireUseCaseGenerator(plop);
     registerCompositionWireFlowGenerator(plop);
+    registerCompositionWireInfrastructureGenerator(plop);
   }
 
   if (includedLayers.includes("Presentation")) {

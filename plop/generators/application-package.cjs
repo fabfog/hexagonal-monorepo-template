@@ -12,11 +12,6 @@ function getApplicationPackageBaseActions(nameExpression) {
     },
     {
       type: "add",
-      path: `../packages/application/${nameExpression}/src/index.ts`,
-      templateFile: "templates/application-package/src/index.ts.hbs",
-    },
-    {
-      type: "add",
       path: `../packages/application/${nameExpression}/src/ports/index.ts`,
       templateFile: "templates/application-package/src/ports/index.ts.hbs",
     },
@@ -52,7 +47,7 @@ module.exports = function registerApplicationPackageGenerator(plop) {
       {
         type: "input",
         name: "packageName",
-        message: "Application package name (e.g. core, editor, billing):",
+        message: "Application package name (e.g. editor, billing):",
         validate: (value) => String(value || "").trim().length > 0 || "Name cannot be empty",
       },
     ],

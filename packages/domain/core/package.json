@@ -5,7 +5,7 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    "./errors": "./src/errors/index.ts"
   },
   "scripts": {
     "lint": "eslint src",

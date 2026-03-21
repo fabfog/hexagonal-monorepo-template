@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { DomainError } from "@domain/core";
+import { z } from "zod";
+import { DomainError } from "@domain/core/errors";
 import { mapErrorToDTO } from "./error.mapper";
 
 describe("mapErrorToDTO", () => {
@@ -18,6 +19,22 @@ describe("mapErrorToDTO", () => {
       severity: "error",
       metadata: { id: "123" },
     });
+  });
+
+  it("maps ZodError to VALIDATION_ERROR with issues in metadata", () => {
+    let caught: unknown;
+    try {
+      z.string().parse(42);
+    } catch (e) {
+      caught = e;
+    }
+
+    const dto = mapErrorToDTO(caught);
+
+    expect(dto.code).toBe("VALIDATION_ERROR");
+    expect(dto.severity).toBe("error");
+    expect(dto.metadata).toBeDefined();
+    expect(Array.isArray(dto.metadata?.issues)).toBe(true);
   });
 
   it("maps generic Error to UNEXPECTED_FAILURE", () => {
@@ -39,6 +56,7 @@ describe("mapErrorToDTO", () => {
       code: "UNKNOWN_ERROR",
       message: "plain error",
       severity: "error",
+      metadata: undefined,
     });
   });
 
@@ -48,5 +66,6 @@ describe("mapErrorToDTO", () => {
     expect(dto.code).toBe("UNKNOWN_ERROR");
     expect(dto.severity).toBe("error");
     expect(dto.message).toBe(JSON.stringify({ foo: "bar" }));
+    expect(dto.metadata).toBeUndefined();
   });
 });

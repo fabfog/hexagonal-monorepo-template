@@ -6,7 +6,7 @@ module.exports = function registerDomainPackageGenerator(plop) {
       {
         type: "input",
         name: "name",
-        message: "Domain package name (e.g. core, user, document):",
+        message: "Domain package name (e.g. user, document):",
         validate: (value) => String(value || "").trim().length > 0 || "Name cannot be empty",
       },
     ],
@@ -21,11 +21,6 @@ module.exports = function registerDomainPackageGenerator(plop) {
           type: "add",
           path: "../packages/domain/{{kebabCase name}}/tsconfig.json",
           templateFile: "templates/domain-package/tsconfig.json.hbs",
-        },
-        {
-          type: "add",
-          path: "../packages/domain/{{kebabCase name}}/src/index.ts",
-          templateFile: "templates/domain-package/src/index.ts.hbs",
         },
         {
           type: "add",
