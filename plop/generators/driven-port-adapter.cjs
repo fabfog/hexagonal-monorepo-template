@@ -1,3 +1,5 @@
+const fs = require("fs");
+const path = require("path");
 const {
   getRepoRoot,
   toKebabCase,
@@ -8,13 +10,15 @@ const {
   getDrivenInfrastructurePackageChoices,
   readApplicationPortSource,
 } = require("../lib");
+const { mergeAdapterContent } = require("../lib/merge-driven-port-adapter.cjs");
 
 const repoRoot = getRepoRoot();
 
 /** @param {import('plop').NodePlopAPI} plop */
 module.exports = function registerDrivenPortAdapterGenerator(plop) {
   plop.setGenerator("driven-port-adapter", {
-    description: "Create a concrete adapter for a normal Port in a driven-* infrastructure package",
+    description:
+      "Create or update a concrete adapter for a normal Port in a driven-* package (new file, or merge missing method stubs only)",
     prompts: [
       {
         type: "list",
@@ -81,11 +85,31 @@ ${methodsCode}}\n`;
       /** @type {import('plop').ActionType[]} */
       const actions = [];
 
-      actions.push({
-        type: "add",
-        path: `../packages/infrastructure/${drivenPackage}/src/adapters/${fileBase}.ts`,
-        template: adapterSource,
-      });
+      const adapterRelPath = `../packages/infrastructure/${drivenPackage}/src/adapters/${fileBase}.ts`;
+      const adapterAbsPath = path.join(
+        repoRoot,
+        "packages",
+        "infrastructure",
+        drivenPackage,
+        "src",
+        "adapters",
+        `${fileBase}.ts`
+      );
+
+      if (fs.existsSync(adapterAbsPath)) {
+        actions.push({
+          type: "modify",
+          path: adapterRelPath,
+          transform: (content) =>
+            mergeAdapterContent(content, { className, interfaceName, methods }),
+        });
+      } else {
+        actions.push({
+          type: "add",
+          path: adapterRelPath,
+          template: adapterSource,
+        });
+      }
 
       actions.push({
         type: "add",
