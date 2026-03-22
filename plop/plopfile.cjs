@@ -22,11 +22,11 @@ const registerCompositionWireUseCaseGenerator = require("./generators/compositio
 const registerCompositionWireFlowGenerator = require("./generators/composition-wire-flow.cjs");
 const registerCompositionWireInfrastructureGenerator = require("./generators/composition-wire-infrastructure.cjs");
 
-const registerPresentationPackageGenerator = require("./generators/presentation-package.cjs");
+const registerUiPackageGenerator = require("./generators/ui-package.cjs");
 
 /** @param {import('plop').NodePlopAPI} plop */
 module.exports = async function (plop) {
-  const layers = ["Domain", "Application", "Infrastructure", "Composition", "Presentation"];
+  const layers = ["Domain", "Application", "Infrastructure", "Composition", "UI"];
 
   const { layer } = await plop.inquirer.prompt([
     {
@@ -72,7 +72,7 @@ module.exports = async function (plop) {
     registerCompositionWireInfrastructureGenerator(plop);
   }
 
-  if (includedLayers.includes("Presentation")) {
-    registerPresentationPackageGenerator(plop);
+  if (includedLayers.includes("UI")) {
+    registerUiPackageGenerator(plop);
   }
 };

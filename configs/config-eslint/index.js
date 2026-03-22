@@ -106,8 +106,8 @@ const config = defineConfig(
           pattern: "apps/**",
         },
         {
-          type: "presentation",
-          pattern: "packages/presentation/**",
+          type: "ui",
+          pattern: "packages/ui/**",
         },
       ],
       "import/resolver": {
@@ -135,7 +135,7 @@ const config = defineConfig(
                   { type: "infrastructure" },
                   { type: "apps" },
                   { type: "composition" },
-                  { type: "presentation" },
+                  { type: "ui" },
                 ],
               },
             })),
@@ -149,7 +149,7 @@ const config = defineConfig(
                   { type: "infrastructure-driven-repository" },
                   { type: "apps" },
                   { type: "composition" },
-                  { type: "presentation" },
+                  { type: "ui" },
                   // Repository adapters may import domain entities; not domain services / stray domain files
                   { type: "domain-services" },
                   { type: "domain" },
@@ -166,7 +166,7 @@ const config = defineConfig(
                   { type: "infrastructure-driven-repository" },
                   { type: "apps" },
                   { type: "composition" },
-                  { type: "presentation" },
+                  { type: "ui" },
                   // Non-repository driven: domain only via errors + value-objects
                   { type: "domain-entities" },
                   { type: "domain-services" },
@@ -184,14 +184,14 @@ const config = defineConfig(
                   { type: "infrastructure-driven-repository" },
                   { type: "apps" },
                   { type: "composition" },
-                  { type: "presentation" },
+                  { type: "ui" },
                 ],
               },
             },
             {
               from: { type: "composition" },
               disallow: {
-                to: [{ type: "apps" }, { type: "presentation" }],
+                to: [{ type: "apps" }, { type: "ui" }],
               },
             },
             {
@@ -206,9 +206,10 @@ const config = defineConfig(
               },
             },
             {
-              from: { type: "presentation" },
+              from: { type: "ui" },
               disallow: {
                 to: [
+                  ...domainLayerTypes.map((type) => ({ type })),
                   { type: "application" },
                   { type: "infrastructure" },
                   { type: "apps" },

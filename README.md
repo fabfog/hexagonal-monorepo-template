@@ -1,6 +1,6 @@
 ## hexagonal-monorepo-template
 
-pnpm-based monorepo designed for a hexagonal architecture (Domain / Application / Infrastructure / Presentation) with shared configuration for TypeScript, ESLint, and Prettier.
+pnpm-based monorepo designed for a hexagonal architecture (Domain / Application / Infrastructure / UI) with shared configuration for TypeScript, ESLint, and Prettier.
 
 ### Requirements
 
@@ -39,7 +39,7 @@ This is where packages with **domain / application / infrastructure code** live,
   - Should contain:
     - Domain entities, business logic, validation schemas, domain errors.
   - Should _not_ contain:
-    - DB/API access, orchestration of use cases, Presentation code (React, Nest controllers, etc.).
+    - DB/API access, orchestration of use cases, UI / view code (React, Nest controllers, etc.).
 
 - **`packages/application/*`**
   - Example: `packages/application/core` (`@application/core`)
@@ -52,13 +52,13 @@ This is where packages with **domain / application / infrastructure code** live,
   Subpath exports only (each package’s `package.json` `exports`); no root `"."` barrel. Examples: `@domain/core/errors`, `@domain/<pkg>/entities`, `@application/<pkg>/ports`, `@application/<pkg>/dtos`, `@application/<pkg>/mappers`.
 
 - **`packages/infrastructure/*`**
-  - Reusable driving adapters (e.g. HTTP controllers, CLI entrypoints, Presentation components that call use cases).
+  - Reusable driving adapters (e.g. HTTP controllers, CLI entrypoints, UI components that call use cases).
   - Driven adapters (e.g. repositories to DB/CMS, InteractionPort adapters, external clients).
   - Infrastructure libraries (`@infrastructure/lib-*`) reused by other Infrastructure packages (e.g. reactive stores, HTTP clients, logging utilities).
     - Example: `@infrastructure/lib-react-immer-store`, a small library that provides:
       - an `ExternalStore<T>` primitive (`createImmerStore`) implemented with Immer (no React dependency) that exposes `getSnapshot`, `getState`, `subscribe`, `update`, and `setState`;
       - a React hook (`useImmerStore`) that turns any `ExternalStore<T>` into a VAI-friendly view accessor via `useSyncExternalStore`.
-    - In the VAI pattern this sits between **Application** and **Presentation** as a reusable technical detail: InteractionPort adapters in the FE can depend on it to manage state, while Domain/Application remain unaware of React/Immer.
+    - In the VAI pattern this sits between **Application** and **UI** as a reusable technical detail: InteractionPort adapters in the FE can depend on it to manage state, while Domain/Application remain unaware of React/Immer.
 
 - **`packages/composition/*`**
   - Example: `packages/composition/web` (`@composition/web`)
@@ -67,6 +67,10 @@ This is where packages with **domain / application / infrastructure code** live,
     - Act as the only place that knows how to assemble domain, application, and infrastructure; apps then depend only on composition (and application DTOs), not on use cases or flows directly.
   - They have a single entry point (`src/index.ts`) and may import from domain, application, and infrastructure.
   - They must _not_ import from `apps/*`.
+
+- **`packages/ui/*`**
+  - View-facing UI packages (components, screens) scoped as `@ui/<name>` (e.g. `packages/ui/react` → `@ui/react`).
+  - May depend on application DTOs and composition; must not import domain, use-cases, flows, or infrastructure directly (see ESLint `boundaries`).
 
 - **`apps/*`**
   - Next.js, Nest, or other runnable apps.
@@ -173,7 +177,7 @@ This repo uses [Plop](https://plopjs.com) to generate domain, application, infra
   | `composition-wire-use-case`           | Wire an existing application use-case into a composition feature dependencies factory (`src/<feature>/dependencies.ts`): adds use-case import + instance in returned dependencies object, and adds `@application/<pkg>` dependency if missing.                                                                                                                 |
   | `composition-wire-flow`               | Wire an existing application flow into a composition feature dependencies factory (`src/<feature>/dependencies.ts`): adds flow import + flow factory in returned dependencies object, and adds `@application/<pkg>` dependency if missing.                                                                                                                     |
   | `composition-wire-infrastructure`     | Wire a `driven-*` package into composition: creates/updates `src/infrastructure.ts` with lazy getters (`let _fooInstance` + `get foo()`), imports the adapter class from `@infrastructure/<driven>`, adds `workspace:*` dep, and re-exports `infrastructure` from `src/index.ts` when missing.                                                                 |
-  | **Presentation**                      |                                                                                                                                                                                                                                                                                                                                                                |
-  | `presentation-package`                | Create a new `@presentation/ui-<name>` package with base package files, test/lint scripts, and single entry point `src/index.ts`.                                                                                                                                                                                                                              |
+  | **UI**                                |                                                                                                                                                                                                                                                                                                                                                                |
+  | `ui-package`                          | Create a new `@ui/<name>` package under `packages/ui/<name>` (e.g. `react` → `packages/ui/react`), with `package.json`, `tsconfig.json`, and `src/index.ts`.                                                                                                                                                                                                   |
 
 Generators are intentionally minimal: they create the right folders, barrels, and base classes/interfaces, but leave TODOs where business logic or mapping must be implemented explicitly.

@@ -5,4 +5,4 @@ packages:
   - "packages/composition/*"
   - "packages/domain/*"
   - "packages/infrastructure/*"
-  - "packages/presentation/*"
+  - "packages/ui/*"
