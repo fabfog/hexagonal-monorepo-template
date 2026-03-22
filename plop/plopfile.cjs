@@ -8,13 +8,13 @@ const registerApplicationPackageGenerator = require("./generators/application-pa
 const registerApplicationUseCaseGenerator = require("./generators/application-use-case.cjs");
 const registerApplicationPortGenerator = require("./generators/application-port.cjs");
 const registerApplicationFlowGenerator = require("./generators/application-flow.cjs");
-const registerApplicationDtoMapperForEntityGenerator = require("./generators/application-dto-mapper-for-entity.cjs");
+const registerApplicationEntityToDtoMapperGenerator = require("./generators/application-entity-to-dto-mapper.cjs");
 
-const registerInfrastructureDrivenAdapterGenerator = require("./generators/infrastructure-driven-adapter.cjs");
-const registerInfrastructureLibGenerator = require("./generators/infrastructure-lib.cjs");
+const registerInfrastructureDrivenAdapterPackageGenerator = require("./generators/infrastructure-driven-adapter-package.cjs");
+const registerInfrastructureLibPackageGenerator = require("./generators/infrastructure-lib-package.cjs");
 const registerDrivenImmerInteractionAdapterGenerator = require("./generators/driven-immer-interaction-adapter.cjs");
 const registerDrivenPortAdapterGenerator = require("./generators/driven-port-adapter.cjs");
-const registerInfrastructureRawToDomainEntityGenerator = require("./generators/infrastructure-raw-to-domain-entity.cjs");
+const registerInfrastructureRawToDomainEntityMapperGenerator = require("./generators/infrastructure-raw-to-domain-entity-mapper.cjs");
 
 const registerCompositionPackageGenerator = require("./generators/composition-package.cjs");
 const registerCompositionFeatureDependenciesGenerator = require("./generators/composition-feature-dependencies.cjs");
@@ -50,18 +50,18 @@ module.exports = async function (plop) {
 
   if (includedLayers.includes("Application")) {
     registerApplicationPackageGenerator(plop);
-    registerApplicationDtoMapperForEntityGenerator(plop);
+    registerApplicationEntityToDtoMapperGenerator(plop);
     registerApplicationPortGenerator(plop);
     registerApplicationUseCaseGenerator(plop);
     registerApplicationFlowGenerator(plop);
   }
 
   if (includedLayers.includes("Infrastructure")) {
-    registerInfrastructureDrivenAdapterGenerator(plop);
-    registerInfrastructureLibGenerator(plop);
+    registerInfrastructureDrivenAdapterPackageGenerator(plop);
+    registerInfrastructureLibPackageGenerator(plop);
     registerDrivenPortAdapterGenerator(plop);
     registerDrivenImmerInteractionAdapterGenerator(plop);
-    registerInfrastructureRawToDomainEntityGenerator(plop);
+    registerInfrastructureRawToDomainEntityMapperGenerator(plop);
   }
 
   if (includedLayers.includes("Composition")) {

@@ -6,8 +6,8 @@ const REPOSITORY_IN_NAME_MESSAGE =
   "when you answer yes, the folder and package name will be prefixed with driven-repository-.";
 
 /** @param {import('plop').NodePlopAPI} plop */
-module.exports = function registerInfrastructureDrivenAdapterGenerator(plop) {
-  plop.setGenerator("infrastructure-driven-adapter", {
+module.exports = function registerInfrastructureDrivenAdapterPackageGenerator(plop) {
+  plop.setGenerator("infrastructure-driven-adapter-package", {
     description:
       "Create a new driven infrastructure package: driven-<name> or driven-repository-<name> (persistence adapters)",
     prompts: [
@@ -44,17 +44,17 @@ module.exports = function registerInfrastructureDrivenAdapterGenerator(plop) {
         {
           type: "add",
           path: `../packages/infrastructure/${packageFolder}/package.json`,
-          templateFile: "templates/infrastructure-driven/package.json.hbs",
+          templateFile: "templates/infrastructure-driven-adapter-package/package.json.hbs",
         },
         {
           type: "add",
           path: `../packages/infrastructure/${packageFolder}/tsconfig.json`,
-          templateFile: "templates/infrastructure-driven/tsconfig.json.hbs",
+          templateFile: "templates/infrastructure-driven-adapter-package/tsconfig.json.hbs",
         },
         {
           type: "add",
           path: `../packages/infrastructure/${packageFolder}/src/index.ts`,
-          templateFile: "templates/infrastructure-driven/src/index.ts.hbs",
+          templateFile: "templates/infrastructure-driven-adapter-package/src/index.ts.hbs",
         },
       ];
 

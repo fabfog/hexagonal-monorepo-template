@@ -1,6 +1,6 @@
 /** @param {import('plop').NodePlopAPI} plop */
-module.exports = function registerInfrastructureLibGenerator(plop) {
-  plop.setGenerator("infrastructure-lib", {
+module.exports = function registerInfrastructureLibPackageGenerator(plop) {
+  plop.setGenerator("infrastructure-lib-package", {
     description:
       "Create a new infrastructure lib package under packages/infrastructure (e.g. lib-react-store)",
     prompts: [
@@ -17,17 +17,17 @@ module.exports = function registerInfrastructureLibGenerator(plop) {
         {
           type: "add",
           path: "../packages/infrastructure/lib-{{kebabCase name}}/package.json",
-          templateFile: "templates/infrastructure-lib/package.json.hbs",
+          templateFile: "templates/infrastructure-lib-package/package.json.hbs",
         },
         {
           type: "add",
           path: "../packages/infrastructure/lib-{{kebabCase name}}/tsconfig.json",
-          templateFile: "templates/infrastructure-lib/tsconfig.json.hbs",
+          templateFile: "templates/infrastructure-lib-package/tsconfig.json.hbs",
         },
         {
           type: "add",
           path: "../packages/infrastructure/lib-{{kebabCase name}}/src/index.ts",
-          templateFile: "templates/infrastructure-lib/src/index.ts.hbs",
+          templateFile: "templates/infrastructure-lib-package/src/index.ts.hbs",
         },
       ];
 

@@ -17,8 +17,8 @@ function getPackageNameChoices() {
 }
 
 /** @param {import('plop').NodePlopAPI} plop */
-module.exports = function registerDomainEntityDtoMapperGenerator(plop) {
-  plop.setGenerator("application-dto-mapper-for-entity", {
+module.exports = function registerApplicationEntityToDtoMapperGenerator(plop) {
+  plop.setGenerator("application-entity-to-dto-mapper", {
     description:
       "Add DTO + mapper for an existing Domain Entity into the corresponding @application/* package",
     prompts: [
@@ -119,21 +119,21 @@ module.exports = function registerDomainEntityDtoMapperGenerator(plop) {
       actions.push({
         type: "add",
         path: `../packages/application/${applicationPackage}/src/dtos/${entityKebab}.dto.ts`,
-        templateFile: "templates/application-dto-mapper-for-entity/dto.ts.hbs",
+        templateFile: "templates/application-entity-to-dto-mapper/dto.ts.hbs",
       });
 
       // Mapper file
       actions.push({
         type: "add",
         path: `../packages/application/${applicationPackage}/src/mappers/${entityKebab}.mapper.ts`,
-        templateFile: "templates/application-dto-mapper-for-entity/mapper.ts.hbs",
+        templateFile: "templates/application-entity-to-dto-mapper/mapper.ts.hbs",
       });
 
       // Mapper test file
       actions.push({
         type: "add",
         path: `../packages/application/${applicationPackage}/src/mappers/${entityKebab}.mapper.test.ts`,
-        templateFile: "templates/application-dto-mapper-for-entity/mapper.test.ts.hbs",
+        templateFile: "templates/application-entity-to-dto-mapper/mapper.test.ts.hbs",
       });
 
       // Update dtos barrel

@@ -15,8 +15,8 @@ function getDomainPackageChoices() {
 }
 
 /** @param {import('plop').NodePlopAPI} plop */
-module.exports = function registerInfrastructureRawToDomainEntityGenerator(plop) {
-  plop.setGenerator("infrastructure-raw-to-domain-entity", {
+module.exports = function registerInfrastructureRawToDomainEntityMapperGenerator(plop) {
+  plop.setGenerator("infrastructure-raw-to-domain-entity-mapper", {
     description: "Add a raw-to-domain-entity mapper scaffold in any @infrastructure/* package",
     prompts: [
       {
