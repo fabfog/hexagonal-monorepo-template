@@ -147,6 +147,8 @@ This repo uses [Plop](https://plopjs.com) to generate domain, application, infra
   pnpm plop
   ```
 
+- **Skip the layer menu (scripts, CI, tests):** set `PLOP_LAYER` to `All` or to one layer (`Domain`, `Application`, `Infrastructure`, `Composition`, `UI`), or pass `--plop-layer=…` after `--` so pnpm forwards it, e.g. `pnpm plop -- --plop-layer All`. Invalid values throw at startup.
+
 - **Shared Plop utilities** (`plop/lib/`): `index.cjs` re-exports **casing** (`plop/lib/casing.cjs`: `toKebabCase`, `toPascalCase`, `toCamelCase`, `lowerFirst`, `toConstantCase`, `parseInterfaceMethods`) and **packages** (`plop/lib/packages.cjs`: listing workspace packages, Plop `choices`, port/entity/flow/use-case discovery, `packageJsonPath`, `readApplicationPortSource`, `ensureZodDependencyInDomainPackage`, etc.). Generators import from `../lib` (resolved via `plop/lib/package.json`).
 
 - **Available generators** (match the names in the Plop menu):
