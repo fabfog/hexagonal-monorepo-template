@@ -125,7 +125,7 @@ function mergeInfrastructureFile(src, p) {
       ${cacheVarName} = new ${adapterClassName}({
         httpClient: createHttpClient(),
         loaders: ${buildRepositoryLoadersCall(runtime)},
-        getCorrelationId: () => crypto.randomUUID(),
+        getCorrelationId: () => globalThis.crypto.randomUUID(),
       });
     }
     return ${cacheVarName};
