@@ -230,9 +230,9 @@ module.exports = function registerDrivenRepositoryAddRepositoryGenerator(plop) {
         );
       }
 
-      const base = portFile.replace(/\.repository\.port\.ts$/, "");
-      const pascalBase = toPascalCase(base);
-      const interfaceName = `${pascalBase}Port`;
+      // Port file is `{entity-kebab}.repository.port.ts` (see application-port); interface is still
+      // `{RepositoryBase}RepositoryPort` (e.g. TicketRepositoryPort), not `{Entity}Port`.
+      const interfaceName = `${repositoryBaseName}RepositoryPort`;
       const methods = parseInterfaceMethods(portSource, interfaceName);
 
       if (!methods.length) {

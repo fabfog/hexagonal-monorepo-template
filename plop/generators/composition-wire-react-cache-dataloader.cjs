@@ -48,6 +48,24 @@ module.exports = function registerCompositionWireReactCacheDataloaderGenerator(p
       /** @type {import('plop').ActionType[]} */
       const actions = [];
 
+      // Apply package.json first so `react` is present even if a later step fails (`import { cache } from "react"`).
+      actions.push({
+        type: "modify",
+        path: `../packages/composition/${compositionPackage}/package.json`,
+        transform: (file) => {
+          const pkg = JSON.parse(file);
+          const prev =
+            pkg.dependencies && typeof pkg.dependencies === "object" ? pkg.dependencies : {};
+          pkg.dependencies = {
+            ...prev,
+            "@infrastructure/lib-dataloader":
+              prev["@infrastructure/lib-dataloader"] ?? "workspace:*",
+            react: prev.react ?? "^19.0.0",
+          };
+          return `${JSON.stringify(pkg, null, 2)}\n`;
+        },
+      });
+
       actions.push({
         type: "add",
         path: `../packages/composition/${compositionPackage}/src/server/get-data-loader-registry.ts`,
@@ -82,22 +100,6 @@ module.exports = function registerCompositionWireReactCacheDataloaderGenerator(p
             'export { createDataLoaderRegistry } from "./data-loader-registry";',
             "createDataLoaderRegistry"
           ),
-      });
-
-      actions.push({
-        type: "modify",
-        path: `../packages/composition/${compositionPackage}/package.json`,
-        transform: (file) => {
-          const pkg = JSON.parse(file);
-          pkg.dependencies = pkg.dependencies || {};
-          if (!pkg.dependencies["@infrastructure/lib-dataloader"]) {
-            pkg.dependencies["@infrastructure/lib-dataloader"] = "workspace:*";
-          }
-          if (!pkg.dependencies["react"]) {
-            pkg.dependencies["react"] = "^19.0.0";
-          }
-          return `${JSON.stringify(pkg, null, 2)}\n`;
-        },
       });
 
       return actions;

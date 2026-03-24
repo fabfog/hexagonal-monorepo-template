@@ -10,7 +10,9 @@
     "test": "vitest run",
     "test:watch": "vitest --watch",
     "test:coverage": "vitest run --coverage",
-    "prepare": "husky install"
+    "prepare": "husky install",
+    "demo:generate": "node scripts/demo/generate-demo-stack.cjs",
+    "demo:remove": "node scripts/demo/remove-demo-stack.cjs"
   },
   "devDependencies": {
     "@repo/config-eslint": "workspace:^",
@@ -19,6 +21,7 @@
     "eslint-config-prettier": "^10.1.8",
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",
+    "node-plop": "^0.32.3",
     "plop": "^4.0.5",
     "prettier": "^3.4.2",
     "vitest": "^4.1.0"

@@ -49,9 +49,11 @@ module.exports = function registerApplicationPortGenerator(plop) {
         name: "repositoryBaseName",
         message: (answers) => {
           const e = answers.entityPascal || "Entity";
+          const fileSlug = toKebabCase(e);
           return (
             `Repository base name (before the Port suffix, e.g. ${e}Repository → ${e}RepositoryPort). ` +
-            `Leave empty to use default: ${e}Repository.`
+            `Leave empty to use default: ${e}Repository. ` +
+            `File: ${fileSlug}.repository.port.ts`
           );
         },
         when: (answers) => answers.portKind === "repository",
@@ -86,7 +88,11 @@ module.exports = function registerApplicationPortGenerator(plop) {
 
       const interfaceName = isInteractionPort ? `${baseName}InteractionPort` : `${baseName}Port`;
 
-      const fileBase = toKebabCase(baseName);
+      // Repository port files use the entity slug only (e.g. ticket.repository.port.ts), not
+      // ticket-repository.repository.port.ts — the ".repository.port" suffix already signals kind.
+      const fileBase = isRepositoryPort
+        ? toKebabCase(entityPascalForDefault)
+        : toKebabCase(baseName);
       const fileSuffix = isInteractionPort
         ? ".interaction.port"
         : isRepositoryPort
