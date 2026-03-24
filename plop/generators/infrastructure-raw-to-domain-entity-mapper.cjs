@@ -69,12 +69,18 @@ export function map${rawNamePascal}To${entityClassName}(raw: ${rawName}): ${enti
       actions.push({
         type: "add",
         path: `../packages/infrastructure/${infrastructurePackage}/src/mappers/${mapperFileBase}.mapper.test.ts`,
-        template: `import { describe, it, expect } from 'vitest';
+        template: `import { describe, it } from 'vitest';
 import { map${rawNamePascal}To${entityClassName} } from './${mapperFileBase}.mapper';
 
+/**
+ * Deliberately failing scaffold: replace after implementing ./${mapperFileBase}.mapper.ts
+ */
 describe('map${rawNamePascal}To${entityClassName}', () => {
-  it('throws until implemented', () => {
-    expect(() => map${rawNamePascal}To${entityClassName}({} as never)).toThrow(/Not implemented/);
+  it('fails until you implement the mapper and real tests', () => {
+    void map${rawNamePascal}To${entityClassName};
+    throw new Error(
+      'Generator scaffold: implement map${rawNamePascal}To${entityClassName}, then delete this test and assert raw → ${entityClassName} mapping.',
+    );
   });
 });
 `,

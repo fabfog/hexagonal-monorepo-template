@@ -1,8 +1,8 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it } from "vitest";
 import {
   {{pascalCase flowName}}Flow,
   type {{pascalCase flowName}}FlowDependencies,
-} from './{{kebabCase flowName}}.flow';
+} from "./{{kebabCase flowName}}.flow";
 
 // NOTE: interaction port is injected from composition layer, so here we can pass a simple stub
 const interactionPortStub = {};
@@ -11,10 +11,15 @@ const deps: {{pascalCase flowName}}FlowDependencies = {
   interactionPort: interactionPortStub,
 };
 
-describe('{{pascalCase flowName}}Flow', () => {
-  it('can be instantiated', () => {
-    const flow = new {{pascalCase flowName}}Flow(deps);
-    expect(flow).toBeInstanceOf({{pascalCase flowName}}Flow);
+/**
+ * Deliberately failing scaffold: replace this file after implementing
+ * `./{{kebabCase flowName}}.flow.ts` and the interaction port.
+ */
+describe("{{pascalCase flowName}}Flow", () => {
+  it("fails until you implement real flow tests", () => {
+    void new {{pascalCase flowName}}Flow(deps);
+    throw new Error(
+      "Generator scaffold: implement {{pascalCase flowName}}Flow and port stubs, then delete this test and add behaviour-driven cases.",
+    );
   });
 });
-

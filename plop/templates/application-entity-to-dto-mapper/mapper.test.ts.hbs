@@ -1,8 +1,15 @@
-import { describe, it, expect } from 'vitest';
-import { map{{pascalCase entityName}}ToDTO } from './{{kebabCase entityName}}.mapper';
+import { describe, it } from "vitest";
+import { map{{pascalCase entityName}}ToDTO } from "./{{kebabCase entityName}}.mapper";
 
-describe('map{{pascalCase entityName}}ToDTO', () => {
-  it('is defined', () => {
-    expect(map{{pascalCase entityName}}ToDTO).toBeTypeOf('function');
+/**
+ * Deliberately failing scaffold: replace this file after implementing
+ * `./{{kebabCase entityName}}.mapper.ts`.
+ */
+describe("map{{pascalCase entityName}}ToDTO", () => {
+  it("fails until you assert real entity → DTO mapping", () => {
+    void map{{pascalCase entityName}}ToDTO;
+    throw new Error(
+      "Generator scaffold: implement map{{pascalCase entityName}}ToDTO, then delete this test and assert fields/metadata you care about.",
+    );
   });
 });
