@@ -1,4 +1,8 @@
-const { getRepoRoot, getCompositionPackageChoices } = require("../lib");
+const {
+  getRepoRoot,
+  getCompositionPackageChoices,
+  assertCompositionRuntimeIndexExists,
+} = require("../lib");
 
 const repoRoot = getRepoRoot();
 
@@ -52,7 +56,9 @@ module.exports = function registerCompositionWireReactCacheDataloaderGenerator(p
       actions.push({
         type: "modify",
         path: `../packages/composition/${compositionPackage}/package.json`,
-        transform: (file) => {
+        transform: (file, data) => {
+          assertCompositionRuntimeIndexExists(repoRoot, data.compositionPackage, "server");
+          assertCompositionRuntimeIndexExists(repoRoot, data.compositionPackage, "client");
           const pkg = JSON.parse(file);
           const prev =
             pkg.dependencies && typeof pkg.dependencies === "object" ? pkg.dependencies : {};

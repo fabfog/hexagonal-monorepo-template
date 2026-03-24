@@ -3,6 +3,8 @@ const {
   getCompositionPackageChoices,
   getDrivenInfrastructurePackageChoices,
   COMPOSITION_RUNTIMES,
+  ensureCompositionRuntimeFiles,
+  mergeCompositionPackageExports,
 } = require("../lib");
 
 const repoRoot = getRepoRoot();
@@ -241,36 +243,16 @@ module.exports = function registerCompositionWireInfrastructureGenerator(plop) {
       /** @type {import('plop').ActionType[]} */
       const actions = [];
 
-      for (const runtime of runtimes) {
-        const infraDir = `src/${runtime}`;
-        const infraPath = `../packages/composition/${compositionPackage}/${infraDir}/infrastructure.ts`;
-
-        actions.push({
-          type: "add",
-          path: infraPath,
-          template: "export const infrastructure = {};\n",
-          skipIfExists: true,
-        });
-
-        actions.push({
-          type: "modify",
-          path: infraPath,
-          transform: (file) =>
-            mergeInfrastructureFile(file, {
-              drivenPackage,
-              infrastructureKey,
-              cacheVarName,
-              adapterClassName,
-              runtime,
-            }),
-        });
-      }
-
       actions.push({
         type: "modify",
         path: `../packages/composition/${compositionPackage}/package.json`,
-        transform: (file) => {
+        transform: (file, data) => {
+          for (const runtime of data.runtimes) {
+            ensureCompositionRuntimeFiles(repoRoot, data.compositionPackage, runtime);
+          }
           const pkg = JSON.parse(file);
+          mergeCompositionPackageExports(pkg, data.runtimes);
+
           const infraDep = `@infrastructure/${drivenPackage}`;
 
           pkg.dependencies = pkg.dependencies || {};
@@ -290,6 +272,24 @@ module.exports = function registerCompositionWireInfrastructureGenerator(plop) {
           return `${JSON.stringify(pkg, null, 2)}\n`;
         },
       });
+
+      for (const runtime of runtimes) {
+        const infraDir = `src/${runtime}`;
+        const infraPath = `../packages/composition/${compositionPackage}/${infraDir}/infrastructure.ts`;
+
+        actions.push({
+          type: "modify",
+          path: infraPath,
+          transform: (file) =>
+            mergeInfrastructureFile(file, {
+              drivenPackage,
+              infrastructureKey,
+              cacheVarName,
+              adapterClassName,
+              runtime,
+            }),
+        });
+      }
 
       return actions;
     },

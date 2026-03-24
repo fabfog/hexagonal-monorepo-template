@@ -108,16 +108,16 @@ const STEPS = /** @type {DemoStep[]} */ ([
   },
   {
     name: "composition-package",
-    note: "Composition root with isomorphic, server, and client entry points",
+    note: "Composition shell (runtime entry points added with the feature step)",
     answers: { name: DEMO_COMPOSITION },
   },
   {
     name: "composition-feature-dependencies",
-    note: "Feature factory registered on all three runtimes",
+    note: "Feature factory registered on needed runtimes",
     answers: {
       packageName: DEMO_COMPOSITION,
       featureName: DEMO_FEATURE,
-      runtimes: ["isomorphic", "server", "client"],
+      runtimes: ["server", "client"],
     },
   },
   {

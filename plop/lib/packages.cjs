@@ -441,6 +441,86 @@ function ensureZodDependencyInDomainPackage(repoRoot, domainPackageName) {
   return "zod already present in domain package dependencies";
 }
 
+const COMPOSITION_RUNTIME_INFRASTRUCTURE_TS = "export const infrastructure = {};\n";
+
+const COMPOSITION_RUNTIME_INDEX_TS = `import { infrastructure } from "./infrastructure";
+
+export { infrastructure };
+export const dependencies = {
+};
+`;
+
+/**
+ * Create src/<runtime>/ (infrastructure.ts + index.ts) if missing.
+ * @param {string} repoRoot
+ * @param {string} compositionPackage
+ * @param {typeof COMPOSITION_RUNTIMES[number]} runtime
+ */
+function ensureCompositionRuntimeFiles(repoRoot, compositionPackage, runtime) {
+  const runtimeDir = packagePath(repoRoot, "composition", compositionPackage, "src", runtime);
+  fs.mkdirSync(runtimeDir, { recursive: true });
+  const infraPath = path.join(runtimeDir, "infrastructure.ts");
+  const indexPath = path.join(runtimeDir, "index.ts");
+  if (!fs.existsSync(infraPath)) {
+    fs.writeFileSync(infraPath, COMPOSITION_RUNTIME_INFRASTRUCTURE_TS, "utf8");
+  }
+  if (!fs.existsSync(indexPath)) {
+    fs.writeFileSync(indexPath, COMPOSITION_RUNTIME_INDEX_TS, "utf8");
+  }
+}
+
+/**
+ * @param {Record<string, string>} exportsObj
+ */
+function sortCompositionExportEntries(exportsObj) {
+  const keys = Object.keys(exportsObj);
+  keys.sort((a, b) => {
+    if (a === ".") return -1;
+    if (b === ".") return 1;
+    return a.localeCompare(b);
+  });
+  const sorted = /** @type {Record<string, string>} */ ({});
+  for (const k of keys) {
+    sorted[k] = exportsObj[k];
+  }
+  return sorted;
+}
+
+/**
+ * Add package.json exports for the given runtimes (idempotent). Mutates `pkg`.
+ * @param {Record<string, unknown>} pkg
+ * @param {readonly (typeof COMPOSITION_RUNTIMES[number])[]} runtimes
+ */
+function mergeCompositionPackageExports(pkg, runtimes) {
+  const prev =
+    pkg.exports && typeof pkg.exports === "object" && !Array.isArray(pkg.exports)
+      ? /** @type {Record<string, string>} */ ({ ...pkg.exports })
+      : /** @type {Record<string, string>} */ ({});
+  for (const runtime of runtimes) {
+    const key = runtime === "isomorphic" ? "." : `./${runtime}`;
+    const val = `./src/${runtime}/index.ts`;
+    if (prev[key] == null) {
+      prev[key] = val;
+    }
+  }
+  pkg.exports = sortCompositionExportEntries(prev);
+}
+
+/**
+ * @param {string} repoRoot
+ * @param {string} compositionPackage
+ * @param {typeof COMPOSITION_RUNTIMES[number]} runtime
+ */
+function assertCompositionRuntimeIndexExists(repoRoot, compositionPackage, runtime) {
+  const p = getEntryIndexPath(repoRoot, compositionPackage, runtime);
+  if (!fs.existsSync(p)) {
+    throw new Error(
+      `Missing ${runtime} entry for @composition/${compositionPackage} (expected ${path.relative(repoRoot, p)}). ` +
+        `Add a feature that includes the "${runtime}" runtime (composition-feature-dependencies), or create that file manually.`
+    );
+  }
+}
+
 module.exports = {
   layerRoot,
   packagePath,
@@ -473,4 +553,7 @@ module.exports = {
   getInfrastructurePath,
   getEntryIndexPath,
   getRuntimesForFeature,
+  ensureCompositionRuntimeFiles,
+  mergeCompositionPackageExports,
+  assertCompositionRuntimeIndexExists,
 };

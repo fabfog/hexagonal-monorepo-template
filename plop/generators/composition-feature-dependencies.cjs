@@ -5,6 +5,8 @@ const {
   toCamelCase,
   getCompositionPackageChoices,
   COMPOSITION_RUNTIMES,
+  ensureCompositionRuntimeFiles,
+  mergeCompositionPackageExports,
 } = require("../lib");
 
 const repoRoot = getRepoRoot();
@@ -140,6 +142,19 @@ module.exports = function registerCompositionFeatureDependenciesGenerator(plop) 
 
       /** @type {import('plop').ActionType[]} */
       const actions = [];
+
+      actions.push({
+        type: "modify",
+        path: `../packages/composition/${packageName}/package.json`,
+        transform: (file, data) => {
+          const pkg = JSON.parse(file);
+          for (const runtime of data.runtimes) {
+            ensureCompositionRuntimeFiles(repoRoot, data.packageName, runtime);
+          }
+          mergeCompositionPackageExports(pkg, data.runtimes);
+          return `${JSON.stringify(pkg, null, 2)}\n`;
+        },
+      });
 
       for (const runtime of runtimes) {
         const depsDir = `src/${runtime}`;
