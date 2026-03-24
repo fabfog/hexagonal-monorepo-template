@@ -13,6 +13,19 @@ pnpm-based monorepo designed for a hexagonal architecture (Domain / Application 
 pnpm install
 ```
 
+### Dependency updates (Renovate)
+
+[Renovate](https://github.com/renovatebot/renovate) opens PRs/MRs to keep npm dependencies and `pnpm-lock.yaml` current. This repo includes a root [`renovate.json`](./renovate.json) tuned for a **pnpm workspace** (single lockfile, all packages discovered automatically).
+
+**Enable it on your forge** (same config file everywhere):
+
+- **GitHub**: [Renovate GitHub App](https://github.com/apps/renovate)
+- **GitLab**: [Renovate for GitLab](https://docs.renovatebot.com/modules/platform/gitlab/)
+- **Bitbucket** (Cloud / Server): [Bitbucket](https://docs.renovatebot.com/modules/platform/bitbucket/) · [Bitbucket Server](https://docs.renovatebot.com/modules/platform/bitbucket-server/)
+- **Other / air-gapped**: [self-hosted](https://docs.renovatebot.com/getting-started/running/) (Docker, CLI, or pipeline job) with the same `renovate.json`
+
+Optional: validate config locally with `npx -p renovate renovate-config-validator renovate.json` (downloads the `renovate` package on first run).
+
 ### Root scripts
 
 - `pnpm lint` – Run ESLint on the whole monorepo (with architectural constraints)

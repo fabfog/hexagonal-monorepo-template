@@ -12,7 +12,8 @@
     "test:coverage": "vitest run --coverage",
     "prepare": "husky install",
     "demo:generate": "node scripts/demo/generate-demo-stack.cjs",
-    "demo:remove": "node scripts/demo/remove-demo-stack.cjs"
+    "demo:remove": "node scripts/demo/remove-demo-stack.cjs",
+    "validate:deps": "npx -p renovate renovate-config-validator renovate.json"
   },
   "devDependencies": {
     "@repo/config-eslint": "workspace:^",
