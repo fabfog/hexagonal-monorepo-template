@@ -1,22 +1,31 @@
 import { z } from 'zod';
 
+import { {{pascalCase entityName}}Id } from '../value-objects/{{kebabCase entityName}}-id.vo';
+
 export const {{pascalCase entityName}}Schema = z.object({
-  // TODO: add fields
+  // TODO: add fields (entity id is a separate value object, not in this schema)
 });
 
-export type {{pascalCase entityName}}Props = z.infer<
+export type {{pascalCase entityName}}DataProps = z.infer<
   typeof {{pascalCase entityName}}Schema
 >;
 
-export class {{pascalCase entityName}}Entity {
-  private props: {{pascalCase entityName}}Props;
+export type {{pascalCase entityName}}Props = { id: {{pascalCase entityName}}Id } &
+  {{pascalCase entityName}}DataProps;
 
-  constructor(props: {{pascalCase entityName}}Props) {
-    this.props = {{pascalCase entityName}}Schema.parse(props);
+export class {{pascalCase entityName}}Entity {
+  private readonly id: {{pascalCase entityName}}Id;
+  private readonly props: {{pascalCase entityName}}DataProps;
+
+  constructor({ id, ...data }: {{pascalCase entityName}}Props) {
+    this.id = id;
+    this.props = {{pascalCase entityName}}Schema.parse(data);
   }
 
   getProps(): Readonly<{{pascalCase entityName}}Props> {
-    return this.props;
+    return Object.freeze({
+      id: this.id,
+      ...this.props,
+    });
   }
 }
-

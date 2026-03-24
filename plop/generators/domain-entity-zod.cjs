@@ -6,6 +6,7 @@ const {
   ensureZodDependencyInDomainPackage,
 } = require("../lib");
 const { appendEnsureEntityNotFoundErrorActions } = require("../lib/entity-not-found-error.cjs");
+const { appendDomainValueObjectZodActions } = require("../lib/domain-value-object-zod.cjs");
 
 const repoRoot = getRepoRoot();
 
@@ -42,7 +43,15 @@ module.exports = function registerDomainEntityZodGenerator(plop) {
       const kebab = toKebabCase(entityName);
       const entityPascal = toPascalCase(String(entityName || "").trim());
 
-      const actions = [
+      const actions = [];
+
+      appendDomainValueObjectZodActions(actions, {
+        domainPackage,
+        valueObjectName: `${entityPascal}Id`,
+        valueObjectKind: "string",
+      });
+
+      actions.push(
         {
           type: "add",
           path: "../packages/domain/{{domainPackage}}/src/entities/{{kebabCase entityName}}.entity.ts",
@@ -58,18 +67,18 @@ module.exports = function registerDomainEntityZodGenerator(plop) {
           path: "../packages/domain/{{domainPackage}}/src/entities/index.ts",
           transform: (file) => {
             const cleaned = file.replace(/^export\s*{\s*}\s*;?\s*$/m, "").trimEnd();
-            const exportLine = `export * from './${kebab}.entity';`;
+            const exportEntity = `export * from './${kebab}.entity';`;
 
-            if (cleaned.includes(exportLine)) {
-              return `${cleaned}\n`;
+            let next = cleaned;
+            if (!next.includes(exportEntity)) {
+              next = next.length > 0 ? `${next}\n${exportEntity}` : exportEntity;
             }
 
-            const base = cleaned.length > 0 ? `${cleaned}\n` : "";
-            return `${base}${exportLine}\n`;
+            return `${next}\n`;
           },
         },
-        () => ensureZodDependencyInDomainPackage(repoRoot, domainPackage),
-      ];
+        () => ensureZodDependencyInDomainPackage(repoRoot, domainPackage)
+      );
 
       if (addNotFoundError) {
         appendEnsureEntityNotFoundErrorActions(actions, {

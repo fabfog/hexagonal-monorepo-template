@@ -1,16 +1,17 @@
 const {
   getRepoRoot,
-  toKebabCase,
   getDomainPackageChoices,
   ensureZodDependencyInDomainPackage,
 } = require("../lib");
+const { appendDomainValueObjectZodActions } = require("../lib/domain-value-object-zod.cjs");
 
 const repoRoot = getRepoRoot();
 
 /** @param {import('plop').NodePlopAPI} plop */
 module.exports = function registerDomainValueObjectZodGenerator(plop) {
   plop.setGenerator("domain-value-object-zod", {
-    description: "Add a new Value Object with Zod schema to an existing @domain/* package",
+    description:
+      "Add a Value Object (string value, or full object VO with getProps) to an existing @domain/* package",
     prompts: [
       {
         type: "list",
@@ -22,37 +23,36 @@ module.exports = function registerDomainValueObjectZodGenerator(plop) {
         type: "input",
         name: "valueObjectName",
         message:
-          "Value Object base name (e.g. UserId, EmailAddress). Do not include ValueObject in the name, it will be added automatically:",
+          "Value Object base name (e.g. UserId, EmailAddress). Class name matches this exactly; file will be `<kebab>.vo.ts`.",
         validate: (value) => String(value || "").trim().length > 0 || "Name cannot be empty",
+      },
+      {
+        type: "list",
+        name: "valueObjectKind",
+        message: "VO shape:",
+        choices: [
+          {
+            name: "String value — required `value: string`, getter `value`, `equals` on `value`",
+            value: "string",
+          },
+          {
+            name: "Object — arbitrary z.object, `getProps()`, you implement `equals`",
+            value: "object",
+          },
+        ],
+        default: "string",
       },
     ],
     actions: (data) => {
-      const { domainPackage, valueObjectName } = data;
-      const kebab = toKebabCase(valueObjectName);
+      const { domainPackage, valueObjectName, valueObjectKind } = data;
 
-      const actions = [
-        {
-          type: "add",
-          path: "../packages/domain/{{domainPackage}}/src/value-objects/{{kebabCase valueObjectName}}.vo.ts",
-          templateFile: "templates/domain-value-object-zod/value-object.ts.hbs",
-        },
-        {
-          type: "modify",
-          path: "../packages/domain/{{domainPackage}}/src/value-objects/index.ts",
-          transform: (file) => {
-            const cleaned = file.replace(/^export\s*{\s*}\s*;?\s*$/m, "").trimEnd();
-            const exportLine = `export * from './${kebab}.vo';`;
-
-            if (cleaned.includes(exportLine)) {
-              return `${cleaned}\n`;
-            }
-
-            const base = cleaned.length > 0 ? `${cleaned}\n` : "";
-            return `${base}${exportLine}\n`;
-          },
-        },
-        () => ensureZodDependencyInDomainPackage(repoRoot, domainPackage),
-      ];
+      const actions = [];
+      appendDomainValueObjectZodActions(actions, {
+        domainPackage,
+        valueObjectName,
+        valueObjectKind,
+      });
+      actions.push(() => ensureZodDependencyInDomainPackage(repoRoot, domainPackage));
 
       return actions;
     },

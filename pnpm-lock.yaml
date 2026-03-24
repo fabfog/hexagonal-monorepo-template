@@ -74,15 +74,6 @@ importers:
         specifier: ^3.23.8
         version: 3.25.76
 
-  packages/composition/web:
-    dependencies:
-      '@infrastructure/lib-dataloader':
-        specifier: workspace:*
-        version: link:../../infrastructure/lib-dataloader
-      react:
-        specifier: ^19.0.0
-        version: 19.2.4
-
   packages/domain/core:
     devDependencies:
       vitest:
