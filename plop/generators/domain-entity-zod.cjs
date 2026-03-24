@@ -1,9 +1,11 @@
 const {
   getRepoRoot,
   toKebabCase,
+  toPascalCase,
   getDomainPackageChoices,
   ensureZodDependencyInDomainPackage,
 } = require("../lib");
+const { appendEnsureEntityNotFoundErrorActions } = require("../lib/entity-not-found-error.cjs");
 
 const repoRoot = getRepoRoot();
 
@@ -25,10 +27,20 @@ module.exports = function registerDomainEntityZodGenerator(plop) {
           "Entity base name (e.g. Document, UserProfile). Do not include Entity in the name, it will be added automatically:",
         validate: (value) => String(value || "").trim().length > 0 || "Name cannot be empty",
       },
+      {
+        type: "confirm",
+        name: "addNotFoundError",
+        default: true,
+        message: (answers) => {
+          const name = toPascalCase(String(answers.entityName || "").trim());
+          return `Also create ${name}NotFoundError associated with ${name}?`;
+        },
+      },
     ],
     actions: (data) => {
-      const { domainPackage, entityName } = data;
+      const { domainPackage, entityName, addNotFoundError } = data;
       const kebab = toKebabCase(entityName);
+      const entityPascal = toPascalCase(String(entityName || "").trim());
 
       const actions = [
         {
@@ -58,6 +70,14 @@ module.exports = function registerDomainEntityZodGenerator(plop) {
         },
         () => ensureZodDependencyInDomainPackage(repoRoot, domainPackage),
       ];
+
+      if (addNotFoundError) {
+        appendEnsureEntityNotFoundErrorActions(actions, {
+          repoRoot,
+          domainPackage,
+          entityPascal,
+        });
+      }
 
       return actions;
     },

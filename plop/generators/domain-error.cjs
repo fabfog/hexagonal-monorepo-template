@@ -1,4 +1,11 @@
+const fs = require("fs");
+const path = require("path");
 const { getRepoRoot, toKebabCase, toConstantCase, getDomainPackageChoices } = require("../lib");
+const {
+  getEntityNotFoundErrorSpec,
+  renderEntityNotFoundErrorFile,
+  appendDomainErrorsBarrelExport,
+} = require("../lib/entity-not-found-error.cjs");
 
 const repoRoot = getRepoRoot();
 
@@ -16,41 +23,93 @@ module.exports = function registerDomainErrorGenerator(plop) {
         choices: getDomainPackageChoices(repoRoot, { excludeCore: false }),
       },
       {
+        type: "list",
+        name: "errorKind",
+        message: "Error kind:",
+        choices: [
+          {
+            name: "Not found — entity id in message & metadata (e.g. UserNotFoundError)",
+            value: "not-found",
+          },
+          {
+            name: "Other — custom name & static message (template)",
+            value: "custom",
+          },
+        ],
+      },
+      {
+        type: "input",
+        name: "entityPascal",
+        message: "Entity name (PascalCase, e.g. User):",
+        when: (answers) => answers.errorKind === "not-found",
+        validate: (value) => {
+          const v = String(value || "").trim();
+          if (!v) return "Name cannot be empty";
+          if (!/^[A-Z][a-zA-Z0-9]*$/.test(v)) {
+            return "Use PascalCase (e.g. User, OrderLine)";
+          }
+          return true;
+        },
+        filter: (value) => String(value || "").trim(),
+      },
+      {
         type: "input",
         name: "errorName",
         message: "Error name (e.g. NotFound, InvalidState):",
+        when: (answers) => answers.errorKind === "custom",
         validate: (value) => String(value || "").trim().length > 0 || "Name cannot be empty",
       },
     ],
     actions: (data) => {
-      const { domainPackage, errorName } = data;
-      const kebab = toKebabCase(errorName);
+      const { domainPackage, errorKind } = data;
 
       /** @type {import('plop').ActionType[]} */
       const actions = [];
 
-      // Add error file
-      actions.push({
-        type: "add",
-        path: "../packages/domain/{{domainPackage}}/src/errors/{{kebabCase errorName}}.error.ts",
-        templateFile: "templates/domain-error/error.ts.hbs",
-      });
+      if (errorKind === "not-found") {
+        const entityPascal = data.entityPascal;
+        const spec = getEntityNotFoundErrorSpec(entityPascal);
+        const errorAbsPath = path.join(
+          repoRoot,
+          "packages",
+          "domain",
+          domainPackage,
+          "src",
+          "errors",
+          `${spec.fileKebab}.error.ts`
+        );
 
-      // Update errors barrel
+        if (fs.existsSync(errorAbsPath)) {
+          throw new Error(
+            `Error file already exists: ${errorAbsPath}. Remove it or pick another entity.`
+          );
+        }
+
+        actions.push({
+          type: "add",
+          path: `../packages/domain/${domainPackage}/src/errors/${spec.fileKebab}.error.ts`,
+          template: renderEntityNotFoundErrorFile(entityPascal),
+        });
+      } else {
+        const { errorName } = data;
+        const kebab = toKebabCase(errorName);
+
+        actions.push({
+          type: "add",
+          path: "../packages/domain/{{domainPackage}}/src/errors/{{kebabCase errorName}}.error.ts",
+          templateFile: "templates/domain-error/error.ts.hbs",
+        });
+      }
+
+      const exportFileKebab =
+        errorKind === "not-found"
+          ? getEntityNotFoundErrorSpec(data.entityPascal).fileKebab
+          : toKebabCase(data.errorName);
+
       actions.push({
         type: "modify",
         path: "../packages/domain/{{domainPackage}}/src/errors/index.ts",
-        transform: (file) => {
-          const cleaned = file.replace(/^export\s*{\s*}\s*;?\s*$/m, "").trimEnd();
-          const exportLine = `export * from './${kebab}.error';`;
-
-          if (cleaned.includes(exportLine)) {
-            return `${cleaned}\n`;
-          }
-
-          const base = cleaned.length > 0 ? `${cleaned}\n` : "";
-          return `${base}${exportLine}\n`;
-        },
+        transform: (file) => appendDomainErrorsBarrelExport(file, exportFileKebab),
       });
 
       return actions;

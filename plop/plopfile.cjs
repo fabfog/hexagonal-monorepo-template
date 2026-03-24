@@ -1,78 +1,22 @@
-const registerDomainPackageGenerator = require("./generators/domain-package.cjs");
-const registerDomainEntityZodGenerator = require("./generators/domain-entity-zod.cjs");
-const registerDomainValueObjectZodGenerator = require("./generators/domain-value-object-zod.cjs");
-const registerDomainErrorGenerator = require("./generators/domain-error.cjs");
-const registerDomainServiceGenerator = require("./generators/domain-service.cjs");
-
-const registerApplicationPackageGenerator = require("./generators/application-package.cjs");
-const registerApplicationUseCaseGenerator = require("./generators/application-use-case.cjs");
-const registerApplicationPortGenerator = require("./generators/application-port.cjs");
-const registerApplicationFlowGenerator = require("./generators/application-flow.cjs");
-const registerApplicationDtoMapperForEntityGenerator = require("./generators/application-dto-mapper-for-entity.cjs");
-
-const registerInfrastructureDrivenAdapterGenerator = require("./generators/infrastructure-driven-adapter.cjs");
-const registerInfrastructureLibGenerator = require("./generators/infrastructure-lib.cjs");
-const registerDrivenImmerInteractionAdapterGenerator = require("./generators/driven-immer-interaction-adapter.cjs");
-const registerDrivenPortAdapterGenerator = require("./generators/driven-port-adapter.cjs");
-const registerInfrastructureRawToDomainEntityGenerator = require("./generators/infrastructure-raw-to-domain-entity.cjs");
-
-const registerCompositionPackageGenerator = require("./generators/composition-package.cjs");
-const registerCompositionFeatureDependenciesGenerator = require("./generators/composition-feature-dependencies.cjs");
-const registerCompositionWireUseCaseGenerator = require("./generators/composition-wire-use-case.cjs");
-const registerCompositionWireFlowGenerator = require("./generators/composition-wire-flow.cjs");
-const registerCompositionWireInfrastructureGenerator = require("./generators/composition-wire-infrastructure.cjs");
-
-const registerUiPackageGenerator = require("./generators/ui-package.cjs");
+const { ALL_LAYERS, resolveIncludedLayers } = require("./plop-resolve-layers.cjs");
+const { registerGeneratorsForLayers } = require("./plop-register-generators.cjs");
 
 /** @param {import('plop').NodePlopAPI} plop */
 module.exports = async function (plop) {
-  const layers = ["Domain", "Application", "Infrastructure", "Composition", "UI"];
+  let includedLayers = resolveIncludedLayers();
 
-  const { layer } = await plop.inquirer.prompt([
-    {
-      type: "list",
-      name: "layer",
-      message: "Select generators for layer...",
-      choices: [...layers, "All"],
-      pageSize: 10,
-    },
-  ]);
-
-  const includedLayers = layer === "All" ? layers : [layer];
-
-  if (includedLayers.includes("Domain")) {
-    registerDomainPackageGenerator(plop);
-    registerDomainEntityZodGenerator(plop);
-    registerDomainValueObjectZodGenerator(plop);
-    registerDomainErrorGenerator(plop);
-    registerDomainServiceGenerator(plop);
+  if (!includedLayers) {
+    const { layer } = await plop.inquirer.prompt([
+      {
+        type: "list",
+        name: "layer",
+        message: "Select generators for layer...",
+        choices: [...ALL_LAYERS, "All"],
+        pageSize: 10,
+      },
+    ]);
+    includedLayers = layer === "All" ? [...ALL_LAYERS] : [layer];
   }
 
-  if (includedLayers.includes("Application")) {
-    registerApplicationPackageGenerator(plop);
-    registerApplicationDtoMapperForEntityGenerator(plop);
-    registerApplicationPortGenerator(plop);
-    registerApplicationUseCaseGenerator(plop);
-    registerApplicationFlowGenerator(plop);
-  }
-
-  if (includedLayers.includes("Infrastructure")) {
-    registerInfrastructureDrivenAdapterGenerator(plop);
-    registerInfrastructureLibGenerator(plop);
-    registerDrivenPortAdapterGenerator(plop);
-    registerDrivenImmerInteractionAdapterGenerator(plop);
-    registerInfrastructureRawToDomainEntityGenerator(plop);
-  }
-
-  if (includedLayers.includes("Composition")) {
-    registerCompositionPackageGenerator(plop);
-    registerCompositionFeatureDependenciesGenerator(plop);
-    registerCompositionWireUseCaseGenerator(plop);
-    registerCompositionWireFlowGenerator(plop);
-    registerCompositionWireInfrastructureGenerator(plop);
-  }
-
-  if (includedLayers.includes("UI")) {
-    registerUiPackageGenerator(plop);
-  }
+  registerGeneratorsForLayers(plop, includedLayers);
 };

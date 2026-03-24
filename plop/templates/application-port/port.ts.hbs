@@ -1,4 +1,11 @@
-export interface {{pascalCase interfaceName}} {
-  // TODO: define port contract
-}
+{{#if isRepositoryPort}}
+import type { {{getByIdReturnType}} } from "@domain/{{domainPackageForEntity}}/entities";
 
+{{/if}}
+export interface {{interfaceName}} {
+{{#if isRepositoryPort}}
+  getById(id: string): Promise<{{getByIdReturnType}}>;
+{{else}}
+  // TODO: define port contract
+{{/if}}
+}

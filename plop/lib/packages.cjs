@@ -100,6 +100,16 @@ function getDrivenInfrastructurePackageChoices(repoRoot) {
   return toPlopChoices(names);
 }
 
+/** driven-repository-* packages only */
+function getDrivenRepositoryInfrastructurePackageChoices(repoRoot) {
+  const root = layerRoot(repoRoot, "infrastructure");
+  if (!fs.existsSync(root)) {
+    return [];
+  }
+  const names = listChildDirectoryNames(root).filter((n) => n.startsWith("driven-repository-"));
+  return toPlopChoices(names);
+}
+
 /** @param {string} filePath */
 function readUtf8File(filePath) {
   return fs.readFileSync(filePath, "utf8");
@@ -126,7 +136,8 @@ function getNormalPortChoices(repoRoot, applicationPackage) {
       (entry) =>
         entry.isFile() &&
         entry.name.endsWith(".port.ts") &&
-        !entry.name.endsWith(".interaction.port.ts")
+        !entry.name.endsWith(".interaction.port.ts") &&
+        !entry.name.endsWith(".repository.port.ts")
     )
     .map((entry) => {
       const base = entry.name.replace(/\.port\.ts$/, "");
@@ -137,6 +148,54 @@ function getNormalPortChoices(repoRoot, applicationPackage) {
         value: entry.name,
       };
     });
+}
+
+/**
+ * Repository ports only (*.repository.port.ts).
+ * @param {string} repoRoot
+ * @param {string} applicationPackage
+ * @returns {{ name: string, value: string }[]}
+ */
+function getRepositoryPortChoices(repoRoot, applicationPackage) {
+  const portsDir = applicationPortsDir(repoRoot, applicationPackage);
+  if (!fs.existsSync(portsDir)) {
+    return [];
+  }
+  return fs
+    .readdirSync(portsDir, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && entry.name.endsWith(".repository.port.ts"))
+    .map((entry) => {
+      const base = entry.name.replace(/\.repository\.port\.ts$/, "");
+      const pascal = toPascalCase(base);
+      const interfaceName = `${pascal}Port`;
+      return {
+        name: `${interfaceName} (${entry.name})`,
+        value: entry.name,
+      };
+    });
+}
+
+/**
+ * Reads domain package + entity class from a repository port file source.
+ * Expects: import type { UserEntity } from "@domain/<pkg>/entities";
+ * @param {string} source
+ * @returns {{ domainPackage: string, entityClassName: string, entityPascal: string }}
+ */
+function parseRepositoryPortMetadata(source) {
+  const m = source.match(
+    /import\s+type\s+\{\s*(\w+)\s*\}\s+from\s+["']@domain\/([^/]+)\/entities["']\s*;/
+  );
+  if (!m) {
+    throw new Error(
+      'Could not parse repository port: expected a line like import type { UserEntity } from "@domain/<pkg>/entities";'
+    );
+  }
+  const entityClassName = m[1];
+  const domainPackage = m[2];
+  const entityPascal = entityClassName.endsWith("Entity")
+    ? entityClassName.slice(0, -"Entity".length)
+    : entityClassName;
+  return { domainPackage, entityClassName, entityPascal };
 }
 
 /**
@@ -252,8 +311,62 @@ function getApplicationUseCaseChoices(repoRoot, applicationPackage) {
   return useCases;
 }
 
+/** Runtime entry points for composition packages */
+const COMPOSITION_RUNTIMES = /** @type {const} */ (["isomorphic", "server", "client"]);
+
 /**
- * Subfolders of composition package src that contain dependencies.ts
+ * Path to feature dependencies.ts for a given runtime.
+ * All runtimes under src/<runtime>/<feature>/dependencies.ts
+ * @param {string} repoRoot
+ * @param {string} compositionPackage
+ * @param {string} featureName
+ * @param {keyof typeof COMPOSITION_RUNTIMES} runtime
+ */
+function getFeatureDependenciesPath(repoRoot, compositionPackage, featureName, runtime) {
+  const base = packagePath(repoRoot, "composition", compositionPackage, "src", runtime);
+  return path.join(base, featureName, "dependencies.ts");
+}
+
+/**
+ * Runtimes where a feature exists (has dependencies.ts).
+ * @param {string} repoRoot
+ * @param {string} compositionPackage
+ * @param {string} featureName
+ * @returns {Array<keyof typeof COMPOSITION_RUNTIMES>}
+ */
+function getRuntimesForFeature(repoRoot, compositionPackage, featureName) {
+  return COMPOSITION_RUNTIMES.filter((r) => {
+    const p = getFeatureDependenciesPath(repoRoot, compositionPackage, featureName, r);
+    return fs.existsSync(p);
+  });
+}
+
+/**
+ * Path to infrastructure.ts for a given runtime.
+ * @param {string} repoRoot
+ * @param {string} compositionPackage
+ * @param {keyof typeof COMPOSITION_RUNTIMES} runtime
+ */
+function getInfrastructurePath(repoRoot, compositionPackage, runtime) {
+  const base = packagePath(repoRoot, "composition", compositionPackage, "src", runtime);
+  return path.join(base, "infrastructure.ts");
+}
+
+/**
+ * Path to entry index.ts for a given runtime.
+ * @param {string} repoRoot
+ * @param {string} compositionPackage
+ * @param {keyof typeof COMPOSITION_RUNTIMES} runtime
+ */
+function getEntryIndexPath(repoRoot, compositionPackage, runtime) {
+  const base = packagePath(repoRoot, "composition", compositionPackage, "src", runtime);
+  return path.join(base, "index.ts");
+}
+
+/**
+ * Subfolders of composition package src that contain dependencies.ts.
+ * Scans src/isomorphic, src/server, src/client for <feature>/dependencies.ts.
+ * Returns unique feature names.
  * @param {string} repoRoot
  * @param {string} compositionPackage
  */
@@ -262,11 +375,27 @@ function getCompositionFeatureChoices(repoRoot, compositionPackage) {
   if (!fs.existsSync(srcDir)) {
     throw new Error(`Composition package "${compositionPackage}" has no src folder.`);
   }
-  const features = fs
-    .readdirSync(srcDir, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .filter((entry) => fs.existsSync(path.join(srcDir, entry.name, "dependencies.ts")))
-    .map((entry) => ({ name: entry.name, value: entry.name }));
+  const seen = new Set();
+  const features = [];
+
+  function scanDir(dir) {
+    if (!fs.existsSync(dir)) return;
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        const depsPath = path.join(dir, entry.name, "dependencies.ts");
+        if (fs.existsSync(depsPath) && !seen.has(entry.name)) {
+          seen.add(entry.name);
+          features.push({ name: entry.name, value: entry.name });
+        }
+      }
+    }
+  }
+
+  for (const runtime of COMPOSITION_RUNTIMES) {
+    scanDir(path.join(srcDir, runtime));
+  }
+
   if (!features.length) {
     throw new Error(
       `Composition package "${compositionPackage}" has no features with dependencies.ts. Create one first with "composition-feature-dependencies".`
@@ -324,9 +453,12 @@ module.exports = {
   getCompositionPackageChoices,
   getInfrastructurePackageChoices,
   getDrivenInfrastructurePackageChoices,
+  getDrivenRepositoryInfrastructurePackageChoices,
   readUtf8File,
   applicationPortsDir,
   getNormalPortChoices,
+  getRepositoryPortChoices,
+  parseRepositoryPortMetadata,
   getInteractionPortChoices,
   readApplicationPortSource,
   getDomainEntityChoices,
@@ -336,4 +468,9 @@ module.exports = {
   readPackageJson,
   writePackageJson,
   ensureZodDependencyInDomainPackage,
+  COMPOSITION_RUNTIMES,
+  getFeatureDependenciesPath,
+  getInfrastructurePath,
+  getEntryIndexPath,
+  getRuntimesForFeature,
 };

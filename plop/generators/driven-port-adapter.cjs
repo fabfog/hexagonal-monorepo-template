@@ -29,12 +29,13 @@ module.exports = function registerDrivenPortAdapterGenerator(plop) {
       {
         type: "list",
         name: "portFile",
-        message: "Select Port (from src/ports/*.port.ts, excluding InteractionPort):",
+        message:
+          "Select Port (from src/ports/*.port.ts, excluding InteractionPort and *.repository.port.ts):",
         choices: (answers) => {
           const ports = getNormalPortChoices(repoRoot, answers.applicationPackage);
           if (!ports.length) {
             throw new Error(
-              `No normal Port (*.port.ts) found in application package "${answers.applicationPackage}".`
+              `No normal Port (*.port.ts, excluding repository ports) found in application package "${answers.applicationPackage}".`
             );
           }
           return ports;

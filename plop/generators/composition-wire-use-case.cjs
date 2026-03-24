@@ -5,6 +5,7 @@ const {
   getCompositionFeatureChoices,
   getApplicationPackageChoices,
   getApplicationUseCaseChoices,
+  getRuntimesForFeature,
 } = require("../lib");
 
 const repoRoot = getRepoRoot();
@@ -28,6 +29,22 @@ module.exports = function registerCompositionWireUseCaseGenerator(plop) {
         choices: (answers) => getCompositionFeatureChoices(repoRoot, answers.compositionPackage),
       },
       {
+        type: "checkbox",
+        name: "runtimes",
+        message: "Runtime(s) to add this use case to:",
+        choices: (answers) => {
+          const runtimes = getRuntimesForFeature(
+            repoRoot,
+            answers.compositionPackage,
+            answers.featureName
+          );
+          if (!runtimes.length) return [];
+          return runtimes.map((r) => ({ name: r, value: r }));
+        },
+        validate: (value) =>
+          Array.isArray(value) && value.length > 0 ? true : "Select at least one runtime",
+      },
+      {
         type: "list",
         name: "applicationPackage",
         message: "Select application package:",
@@ -41,53 +58,57 @@ module.exports = function registerCompositionWireUseCaseGenerator(plop) {
       },
     ],
     actions: (data) => {
-      const { compositionPackage, featureName, applicationPackage, useCaseName } = data;
+      const { compositionPackage, featureName, runtimes, applicationPackage, useCaseName } = data;
       const useCaseClassName = `${useCaseName}UseCase`;
       const useCaseVarName = `${lowerFirst(useCaseName)}UseCase`;
       const importLine = `import { ${useCaseClassName} } from '@application/${applicationPackage}/use-cases';`;
-      const featureDepsPath = `../packages/composition/${compositionPackage}/src/${featureName}/dependencies.ts`;
 
       /** @type {import('plop').ActionType[]} */
       const actions = [];
 
-      actions.push({
-        type: "modify",
-        path: featureDepsPath,
-        transform: (file) => {
-          let updated = file;
+      for (const runtime of runtimes) {
+        const depsDir = `src/${runtime}`;
+        const featureDepsPath = `../packages/composition/${compositionPackage}/${depsDir}/${featureName}/dependencies.ts`;
 
-          if (!updated.includes(importLine)) {
-            updated = `${importLine}\n${updated}`;
-          }
+        actions.push({
+          type: "modify",
+          path: featureDepsPath,
+          transform: (file) => {
+            let updated = file;
 
-          // Remove placeholder TODO once at least one dependency is wired
-          updated = updated.replace(
-            /^\s*\/\/ TODO add dependencies \(i\.e\. use-cases and flows\)\s*\n?/m,
-            ""
-          );
+            if (!updated.includes(importLine)) {
+              updated = `${importLine}\n${updated}`;
+            }
 
-          const returnStart = updated.indexOf("return {");
-          if (returnStart === -1) {
-            throw new Error(
-              `Could not find "return {" in ${featureDepsPath}. Expected a composition feature factory format.`
+            // Remove placeholder TODO once at least one dependency is wired
+            updated = updated.replace(
+              /^\s*\/\/ TODO add dependencies \(i\.e\. use-cases and flows\)\s*\n?/m,
+              ""
             );
-          }
 
-          const closing = updated.indexOf("}", returnStart);
-          if (closing === -1) {
-            throw new Error(`Could not find closing "}" of return object in ${featureDepsPath}.`);
-          }
+            const returnStart = updated.indexOf("return {");
+            if (returnStart === -1) {
+              throw new Error(
+                `Could not find "return {" in ${featureDepsPath}. Expected a composition feature factory format.`
+              );
+            }
 
-          const propertyLine = `    ${useCaseVarName}: () => new ${useCaseClassName}({}),`;
-          const returnBody = updated.slice(returnStart, closing);
+            const closing = updated.indexOf("}", returnStart);
+            if (closing === -1) {
+              throw new Error(`Could not find closing "}" of return object in ${featureDepsPath}.`);
+            }
 
-          if (!returnBody.includes(`${useCaseVarName}:`)) {
-            updated = `${updated.slice(0, closing)}${propertyLine}\n${updated.slice(closing)}`;
-          }
+            const propertyLine = `    ${useCaseVarName}: () => new ${useCaseClassName}({}),`;
+            const returnBody = updated.slice(returnStart, closing);
 
-          return updated;
-        },
-      });
+            if (!returnBody.includes(`${useCaseVarName}:`)) {
+              updated = `${updated.slice(0, closing)}${propertyLine}\n${updated.slice(closing)}`;
+            }
+
+            return updated;
+          },
+        });
+      }
 
       actions.push({
         type: "modify",

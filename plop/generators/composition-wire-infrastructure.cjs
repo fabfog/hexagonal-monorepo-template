@@ -2,6 +2,7 @@ const {
   getRepoRoot,
   getCompositionPackageChoices,
   getDrivenInfrastructurePackageChoices,
+  COMPOSITION_RUNTIMES,
 } = require("../lib");
 
 const repoRoot = getRepoRoot();
@@ -101,30 +102,25 @@ function mergeInfrastructureFile(src, p) {
   return updated.endsWith("\n") ? updated : `${updated}\n`;
 }
 
-/**
- * @param {string} src
- */
-function ensureInfrastructureReExport(src) {
-  const line = "export { infrastructure } from './infrastructure';";
-  if (src.includes("from './infrastructure'") || src.includes('from "./infrastructure"')) {
-    return src;
-  }
-  const trimmed = src.trimEnd();
-  if (!trimmed) return `${line}\n`;
-  return `${trimmed}\n\n${line}\n`;
-}
-
 /** @param {import('plop').NodePlopAPI} plop */
 module.exports = function registerCompositionWireInfrastructureGenerator(plop) {
   plop.setGenerator("composition-wire-infrastructure", {
     description:
-      "Wire a driven-* infrastructure package into composition: lazy getters on src/infrastructure.ts + @infrastructure/* dependency",
+      "Wire a driven-* infrastructure package into composition: lazy getters on infrastructure.ts + @infrastructure/* dependency",
     prompts: [
       {
         type: "list",
         name: "compositionPackage",
         message: "Select composition package:",
         choices: getCompositionPackageChoices(repoRoot),
+      },
+      {
+        type: "checkbox",
+        name: "runtimes",
+        message: "Runtime(s) for this infrastructure:",
+        choices: COMPOSITION_RUNTIMES.map((r) => ({ name: r, value: r })),
+        validate: (value) =>
+          Array.isArray(value) && value.length > 0 ? true : "Select at least one runtime",
       },
       {
         type: "list",
@@ -157,37 +153,37 @@ module.exports = function registerCompositionWireInfrastructureGenerator(plop) {
       },
     ],
     actions: (data) => {
-      const { compositionPackage, drivenPackage, infrastructureKey, adapterClassName } = data;
+      const { compositionPackage, runtimes, drivenPackage, infrastructureKey, adapterClassName } =
+        data;
 
       const cacheVarName = `_${infrastructureKey}Instance`;
 
       /** @type {import('plop').ActionType[]} */
       const actions = [];
 
-      actions.push({
-        type: "add",
-        path: `../packages/composition/${compositionPackage}/src/infrastructure.ts`,
-        template: "export const infrastructure = {};\n",
-        skipIfExists: true,
-      });
+      for (const runtime of runtimes) {
+        const infraDir = `src/${runtime}`;
+        const infraPath = `../packages/composition/${compositionPackage}/${infraDir}/infrastructure.ts`;
 
-      actions.push({
-        type: "modify",
-        path: `../packages/composition/${compositionPackage}/src/infrastructure.ts`,
-        transform: (file) =>
-          mergeInfrastructureFile(file, {
-            drivenPackage,
-            infrastructureKey,
-            cacheVarName,
-            adapterClassName,
-          }),
-      });
+        actions.push({
+          type: "add",
+          path: infraPath,
+          template: "export const infrastructure = {};\n",
+          skipIfExists: true,
+        });
 
-      actions.push({
-        type: "modify",
-        path: `../packages/composition/${compositionPackage}/src/index.ts`,
-        transform: (file) => ensureInfrastructureReExport(file),
-      });
+        actions.push({
+          type: "modify",
+          path: infraPath,
+          transform: (file) =>
+            mergeInfrastructureFile(file, {
+              drivenPackage,
+              infrastructureKey,
+              cacheVarName,
+              adapterClassName,
+            }),
+        });
+      }
 
       actions.push({
         type: "modify",

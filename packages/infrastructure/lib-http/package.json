@@ -1,0 +1,21 @@
+{
+  "name": "@infrastructure/lib-http",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint src",
+    "lint:fix": "eslint src --fix",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.0"
+  },
+  "dependencies": {
+    "@infrastructure/lib-dataloader": "workspace:*",
+    "ky": "^1.14.0"
+  }
+}

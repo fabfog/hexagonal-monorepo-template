@@ -2,7 +2,7 @@
 module.exports = function registerCompositionPackageGenerator(plop) {
   plop.setGenerator("composition-package", {
     description:
-      "Create a new composition package (@composition/<name>) with a single entry point src/index.ts",
+      "Create a new composition package (@composition/<name>) with isomorphic, server, and client entry points",
     prompts: [
       {
         type: "input",
@@ -24,8 +24,33 @@ module.exports = function registerCompositionPackageGenerator(plop) {
       },
       {
         type: "add",
-        path: "../packages/composition/{{kebabCase name}}/src/index.ts",
+        path: "../packages/composition/{{kebabCase name}}/src/isomorphic/infrastructure.ts",
+        templateFile: "templates/composition-package/infrastructure.ts.hbs",
+      },
+      {
+        type: "add",
+        path: "../packages/composition/{{kebabCase name}}/src/isomorphic/index.ts",
         templateFile: "templates/composition-package/src/index.ts.hbs",
+      },
+      {
+        type: "add",
+        path: "../packages/composition/{{kebabCase name}}/src/server/infrastructure.ts",
+        templateFile: "templates/composition-package/infrastructure.ts.hbs",
+      },
+      {
+        type: "add",
+        path: "../packages/composition/{{kebabCase name}}/src/server/index.ts",
+        templateFile: "templates/composition-package/src/server/index.ts.hbs",
+      },
+      {
+        type: "add",
+        path: "../packages/composition/{{kebabCase name}}/src/client/infrastructure.ts",
+        templateFile: "templates/composition-package/infrastructure.ts.hbs",
+      },
+      {
+        type: "add",
+        path: "../packages/composition/{{kebabCase name}}/src/client/index.ts",
+        templateFile: "templates/composition-package/src/client/index.ts.hbs",
       },
     ],
   });
