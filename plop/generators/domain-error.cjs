@@ -6,6 +6,7 @@ const {
   renderEntityNotFoundErrorFile,
   appendDomainErrorsBarrelExport,
 } = require("../lib/entity-not-found-error.cjs");
+const { ensureDomainPackageSlice } = require("../lib/ensure-package-slice.cjs");
 
 const repoRoot = getRepoRoot();
 
@@ -65,6 +66,10 @@ module.exports = function registerDomainErrorGenerator(plop) {
 
       /** @type {import('plop').ActionType[]} */
       const actions = [];
+
+      actions.push(() => {
+        ensureDomainPackageSlice(repoRoot, domainPackage, "errors");
+      });
 
       if (errorKind === "not-found") {
         const entityPascal = data.entityPascal;

@@ -5,6 +5,7 @@ const {
   getDomainPackageChoices,
   getDomainEntityChoices,
 } = require("../lib");
+const { ensureApplicationPackageSlice } = require("../lib/ensure-package-slice.cjs");
 
 const repoRoot = getRepoRoot();
 
@@ -108,6 +109,10 @@ module.exports = function registerApplicationPortGenerator(plop) {
 
       /** @type {import('plop').ActionType[]} */
       const actions = [];
+
+      actions.push(() => {
+        ensureApplicationPackageSlice(repoRoot, packageName, "ports");
+      });
 
       actions.push({
         type: "add",

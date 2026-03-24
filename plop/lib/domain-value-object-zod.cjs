@@ -1,13 +1,17 @@
 const { toKebabCase } = require("./casing.cjs");
+const { ensureDomainPackageSlice } = require("./ensure-package-slice.cjs");
 
 /**
  * Appends the same "add .vo.ts + patch value-objects/index.ts" steps as generator `domain-value-object-zod`.
  *
  * @param {unknown[]} actions
- * @param {{ domainPackage: string, valueObjectName: string, valueObjectKind?: 'string' | 'object' }} opts
+ * @param {{ repoRoot: string, domainPackage: string, valueObjectName: string, valueObjectKind?: 'string' | 'object' }} opts
  */
 function appendDomainValueObjectZodActions(actions, opts) {
-  const { domainPackage, valueObjectName } = opts;
+  const { repoRoot, domainPackage, valueObjectName } = opts;
+  if (!repoRoot) {
+    throw new Error("appendDomainValueObjectZodActions requires repoRoot");
+  }
   const valueObjectKind = opts.valueObjectKind ?? "string";
   const kebab = toKebabCase(valueObjectName);
   const voData = { domainPackage, valueObjectName, valueObjectKind };
@@ -15,6 +19,10 @@ function appendDomainValueObjectZodActions(actions, opts) {
     valueObjectKind === "object"
       ? "templates/domain-value-object-zod/value-object-object.ts.hbs"
       : "templates/domain-value-object-zod/value-object-string.ts.hbs";
+
+  actions.unshift(() => {
+    ensureDomainPackageSlice(repoRoot, domainPackage, "value-objects");
+  });
 
   actions.push(
     {

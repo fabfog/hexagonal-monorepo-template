@@ -9,6 +9,7 @@ const {
   toPlopChoices,
 } = require("../lib");
 const { getApplicationPackageBaseActions } = require("./application-package.cjs");
+const { ensureApplicationPackageSlice } = require("../lib/ensure-package-slice.cjs");
 
 const repoRoot = getRepoRoot();
 
@@ -113,6 +114,11 @@ module.exports = function registerApplicationEntityToDtoMapperGenerator(plop) {
 
           return `${JSON.stringify(pkg, null, 2)}\n`;
         },
+      });
+
+      actions.push(() => {
+        ensureApplicationPackageSlice(repoRoot, applicationPackage, "dtos");
+        ensureApplicationPackageSlice(repoRoot, applicationPackage, "mappers");
       });
 
       // DTO file

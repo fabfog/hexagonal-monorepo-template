@@ -143,8 +143,13 @@ const STEPS = /** @type {DemoStep[]} */ ([
     },
   },
   {
+    name: "composition-wire-react-cache-dataloader",
+    note: "Per-request DataLoader registry on server (before repository infra wiring)",
+    answers: { compositionPackage: DEMO_COMPOSITION },
+  },
+  {
     name: "composition-wire-infrastructure",
-    note: "Lazy TicketRepository on server infrastructure",
+    note: "Lazy TicketRepository on server infrastructure (needs get-data-loader-registry.ts)",
     answers: {
       compositionPackage: DEMO_COMPOSITION,
       runtimes: ["server"],
@@ -152,11 +157,6 @@ const STEPS = /** @type {DemoStep[]} */ ([
       infrastructureKey: "ticketRepository",
       adapterClassName: "TicketRepository",
     },
-  },
-  {
-    name: "composition-wire-react-cache-dataloader",
-    note: "Per-request DataLoader registry on server, plain factory on client",
-    answers: { compositionPackage: DEMO_COMPOSITION },
   },
 ]);
 

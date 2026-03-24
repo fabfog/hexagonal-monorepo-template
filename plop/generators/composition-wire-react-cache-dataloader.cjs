@@ -33,7 +33,7 @@ function ensureExport(src, exportLine, symbolName) {
 module.exports = function registerCompositionWireReactCacheDataloaderGenerator(plop) {
   plop.setGenerator("composition-wire-react-cache-dataloader", {
     description:
-      "Wire DataLoader registry: server uses react.cache (per-request singleton), client uses plain createDataLoaderRegistry. Adds react + lib-dataloader deps.",
+      "Wire DataLoader registry: server uses react.cache (per-request singleton), client uses plain createDataLoaderRegistry. Adds react, @types/react (dev), and lib-dataloader.",
     prompts: [
       {
         type: "list",
@@ -48,7 +48,7 @@ module.exports = function registerCompositionWireReactCacheDataloaderGenerator(p
       /** @type {import('plop').ActionType[]} */
       const actions = [];
 
-      // Apply package.json first so `react` is present even if a later step fails (`import { cache } from "react"`).
+      // Apply package.json first so deps/types are present even if a later step fails.
       actions.push({
         type: "modify",
         path: `../packages/composition/${compositionPackage}/package.json`,
@@ -61,6 +61,14 @@ module.exports = function registerCompositionWireReactCacheDataloaderGenerator(p
             "@infrastructure/lib-dataloader":
               prev["@infrastructure/lib-dataloader"] ?? "workspace:*",
             react: prev.react ?? "^19.0.0",
+          };
+          const prevDev =
+            pkg.devDependencies && typeof pkg.devDependencies === "object"
+              ? pkg.devDependencies
+              : {};
+          pkg.devDependencies = {
+            ...prevDev,
+            "@types/react": prevDev["@types/react"] ?? "^19.0.0",
           };
           return `${JSON.stringify(pkg, null, 2)}\n`;
         },

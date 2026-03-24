@@ -12,28 +12,9 @@ function getApplicationPackageBaseActions(nameExpression) {
     },
     {
       type: "add",
-      path: `../packages/application/${nameExpression}/src/ports/index.ts`,
-      templateFile: "templates/application-package/src/ports/index.ts.hbs",
-    },
-    {
-      type: "add",
-      path: `../packages/application/${nameExpression}/src/use-cases/index.ts`,
-      templateFile: "templates/application-package/src/use-cases/index.ts.hbs",
-    },
-    {
-      type: "add",
-      path: `../packages/application/${nameExpression}/src/flows/index.ts`,
-      templateFile: "templates/application-package/src/flows/index.ts.hbs",
-    },
-    {
-      type: "add",
-      path: `../packages/application/${nameExpression}/src/dtos/index.ts`,
-      templateFile: "templates/application-package/src/dtos/index.ts.hbs",
-    },
-    {
-      type: "add",
-      path: `../packages/application/${nameExpression}/src/mappers/index.ts`,
-      templateFile: "templates/application-package/src/mappers/index.ts.hbs",
+      path: `../packages/application/${nameExpression}/src/.gitkeep`,
+      template: "",
+      skipIfExists: true,
     },
   ];
 }
@@ -42,7 +23,7 @@ function getApplicationPackageBaseActions(nameExpression) {
 module.exports = function registerApplicationPackageGenerator(plop) {
   plop.setGenerator("application-package", {
     description:
-      "Create a new application package (@application/<name> with ports/flows/use-cases/dtos/mappers)",
+      "Create a new application package (@application/<name>); ports, use-cases, etc. are added when you first generate into each slice",
     prompts: [
       {
         type: "input",

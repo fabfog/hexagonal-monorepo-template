@@ -7,6 +7,7 @@ const {
 } = require("../lib");
 const { appendEnsureEntityNotFoundErrorActions } = require("../lib/entity-not-found-error.cjs");
 const { appendDomainValueObjectZodActions } = require("../lib/domain-value-object-zod.cjs");
+const { ensureDomainPackageSlice } = require("../lib/ensure-package-slice.cjs");
 
 const repoRoot = getRepoRoot();
 
@@ -46,9 +47,14 @@ module.exports = function registerDomainEntityZodGenerator(plop) {
       const actions = [];
 
       appendDomainValueObjectZodActions(actions, {
+        repoRoot,
         domainPackage,
         valueObjectName: `${entityPascal}Id`,
         valueObjectKind: "string",
+      });
+
+      actions.push(() => {
+        ensureDomainPackageSlice(repoRoot, domainPackage, "entities");
       });
 
       actions.push(

@@ -48,6 +48,7 @@ module.exports = function registerDomainValueObjectZodGenerator(plop) {
 
       const actions = [];
       appendDomainValueObjectZodActions(actions, {
+        repoRoot,
         domainPackage,
         valueObjectName,
         valueObjectKind,

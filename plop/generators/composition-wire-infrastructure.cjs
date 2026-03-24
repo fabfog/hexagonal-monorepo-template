@@ -8,6 +8,13 @@ const {
 const repoRoot = getRepoRoot();
 
 /**
+ * @param {string} drivenPackage
+ */
+function isDrivenRepositoryPackage(drivenPackage) {
+  return typeof drivenPackage === "string" && drivenPackage.startsWith("driven-repository-");
+}
+
+/**
  * @param {string} src
  * @returns {{ openIdx: number, closeIdx: number } | null}
  */
@@ -30,10 +37,79 @@ function findInfrastructureObjectBlock(src) {
 
 /**
  * @param {string} src
- * @param {{ infrastructureKey: string, cacheVarName: string, adapterClassName: string }} p
+ * @param {string} importLine full line including newline not required
+ */
+function insertAfterLastImport(src, importLine) {
+  const lines = src.split("\n");
+  let lastImport = -1;
+  for (let i = 0; i < lines.length; i++) {
+    if (/^\s*import\s/.test(lines[i])) lastImport = i;
+  }
+  if (lastImport >= 0) {
+    lines.splice(lastImport + 1, 0, importLine);
+  } else {
+    lines.unshift(importLine, "");
+  }
+  return lines.join("\n");
+}
+
+/**
+ * @param {string} src
+ * @param {string[]} importLines
+ */
+function ensureImportLines(src, importLines) {
+  let out = src;
+  for (const line of importLines) {
+    const trimmed = line.trim();
+    const fromMatch = trimmed.match(/from\s+["']([^"']+)["']/);
+    const specifier = fromMatch ? fromMatch[1] : "";
+    const hasSameModule =
+      specifier !== "" && (out.includes(`"${specifier}"`) || out.includes(`'${specifier}'`));
+    if (hasSameModule || (specifier === "" && out.includes(trimmed))) {
+      continue;
+    }
+    out = insertAfterLastImport(out, trimmed);
+  }
+  return out;
+}
+
+/**
+ * @param {string} adapterClassName
+ * @param {string} drivenPackage
+ * @param {string} runtime
+ */
+function buildRepositoryImportLines(adapterClassName, drivenPackage, runtime) {
+  const lines = [
+    `import { createHttpClient } from "@infrastructure/lib-http";`,
+    `import { ${adapterClassName} } from "@infrastructure/${drivenPackage}";`,
+  ];
+  if (runtime === "server") {
+    lines.push(`import { getServerDataLoaderRegistry } from "./get-data-loader-registry";`);
+  } else if (runtime === "client") {
+    lines.push(`import { createDataLoaderRegistry } from "./data-loader-registry";`);
+  } else {
+    lines.push(`import { createDataLoaderRegistry } from "@infrastructure/lib-dataloader";`);
+  }
+  return lines;
+}
+
+/**
+ * @param {string} runtime
+ */
+function buildRepositoryLoadersCall(runtime) {
+  if (runtime === "server") return "getServerDataLoaderRegistry()";
+  return "createDataLoaderRegistry()";
+}
+
+/**
+ * @param {string} src
+ * @param {{ infrastructureKey: string, cacheVarName: string, adapterClassName: string, drivenPackage: string, runtime?: string }} p
  */
 function mergeInfrastructureFile(src, p) {
-  const { infrastructureKey, cacheVarName, adapterClassName } = p;
+  const runtime = p.runtime ?? "server";
+  const isRepo = isDrivenRepositoryPackage(p.drivenPackage);
+  const { infrastructureKey, cacheVarName, adapterClassName, drivenPackage } = p;
+
   const getterRe = new RegExp(`get\\s+${infrastructureKey}\\s*\\(`);
   if (getterRe.test(src)) {
     throw new Error(
@@ -41,33 +117,44 @@ function mergeInfrastructureFile(src, p) {
     );
   }
 
-  const importLine = `import { ${adapterClassName} } from '@infrastructure/${p.drivenPackage}';`;
-  let updated = src.trim().length ? src : "";
+  const importLine = `import { ${adapterClassName} } from "@infrastructure/${drivenPackage}";`;
 
-  if (!updated.includes("export const infrastructure")) {
-    const letLine = `let ${cacheVarName}: ${adapterClassName} | undefined;`;
-    const getterBlock = `  get ${infrastructureKey}() {
+  const getterBlock = isRepo
+    ? `  get ${infrastructureKey}() {
+    if (${cacheVarName} === undefined) {
+      ${cacheVarName} = new ${adapterClassName}({
+        httpClient: createHttpClient(),
+        loaders: ${buildRepositoryLoadersCall(runtime)},
+        getCorrelationId: () => crypto.randomUUID(),
+      });
+    }
+    return ${cacheVarName};
+  }`
+    : `  get ${infrastructureKey}() {
     if (${cacheVarName} === undefined) {
       // TODO: pass constructor args (config, env, other ports, etc.)
       ${cacheVarName} = new ${adapterClassName}();
     }
     return ${cacheVarName};
   }`;
-    return `${importLine}\n\n${letLine}\n\nexport const infrastructure = {\n${getterBlock},\n};\n`;
+
+  let updated = src.trim().length ? src : "";
+
+  if (!updated.includes("export const infrastructure")) {
+    const headerImports = isRepo
+      ? buildRepositoryImportLines(adapterClassName, drivenPackage, runtime).join("\n") + "\n"
+      : `${importLine}\n`;
+    const letLine = `let ${cacheVarName}: ${adapterClassName} | undefined;`;
+    return `${headerImports}\n${letLine}\n\nexport const infrastructure = {\n${getterBlock},\n};\n`;
   }
 
-  if (!updated.includes(importLine)) {
-    const lines = updated.split("\n");
-    let lastImport = -1;
-    for (let i = 0; i < lines.length; i++) {
-      if (/^\s*import\s/.test(lines[i])) lastImport = i;
-    }
-    if (lastImport >= 0) {
-      lines.splice(lastImport + 1, 0, importLine);
-    } else {
-      lines.unshift(importLine, "");
-    }
-    updated = lines.join("\n");
+  if (isRepo) {
+    updated = ensureImportLines(
+      updated,
+      buildRepositoryImportLines(adapterClassName, drivenPackage, runtime)
+    );
+  } else if (!updated.includes(importLine)) {
+    updated = insertAfterLastImport(updated, importLine);
   }
 
   const letLine = `let ${cacheVarName}: ${adapterClassName} | undefined;`;
@@ -79,14 +166,6 @@ function mergeInfrastructureFile(src, p) {
     const before = updated.slice(0, infraDecl).trimEnd();
     updated = `${before}\n\n${letLine}\n\n${updated.slice(infraDecl)}`;
   }
-
-  const getterBlock = `  get ${infrastructureKey}() {
-    if (${cacheVarName} === undefined) {
-      // TODO: pass constructor args (config, env, other ports, etc.)
-      ${cacheVarName} = new ${adapterClassName}();
-    }
-    return ${cacheVarName};
-  }`;
 
   const block = findInfrastructureObjectBlock(updated);
   if (!block) {
@@ -106,7 +185,7 @@ function mergeInfrastructureFile(src, p) {
 module.exports = function registerCompositionWireInfrastructureGenerator(plop) {
   plop.setGenerator("composition-wire-infrastructure", {
     description:
-      "Wire a driven-* infrastructure package into composition: lazy getters on infrastructure.ts + @infrastructure/* dependency",
+      "Wire a driven-* package into composition: lazy getters on infrastructure.ts + @infrastructure/* dependency. Repository packages get Ky + DataLoader + correlation wiring.",
     prompts: [
       {
         type: "list",
@@ -157,6 +236,7 @@ module.exports = function registerCompositionWireInfrastructureGenerator(plop) {
         data;
 
       const cacheVarName = `_${infrastructureKey}Instance`;
+      const isRepo = isDrivenRepositoryPackage(drivenPackage);
 
       /** @type {import('plop').ActionType[]} */
       const actions = [];
@@ -181,6 +261,7 @@ module.exports = function registerCompositionWireInfrastructureGenerator(plop) {
               infrastructureKey,
               cacheVarName,
               adapterClassName,
+              runtime,
             }),
         });
       }
@@ -195,6 +276,15 @@ module.exports = function registerCompositionWireInfrastructureGenerator(plop) {
           pkg.dependencies = pkg.dependencies || {};
           if (!pkg.dependencies[infraDep]) {
             pkg.dependencies[infraDep] = "workspace:*";
+          }
+
+          if (isRepo) {
+            if (!pkg.dependencies["@infrastructure/lib-http"]) {
+              pkg.dependencies["@infrastructure/lib-http"] = "workspace:*";
+            }
+            if (!pkg.dependencies["@infrastructure/lib-dataloader"]) {
+              pkg.dependencies["@infrastructure/lib-dataloader"] = "workspace:*";
+            }
           }
 
           return `${JSON.stringify(pkg, null, 2)}\n`;

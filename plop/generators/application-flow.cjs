@@ -1,4 +1,5 @@
 const { getRepoRoot, toKebabCase, getApplicationPackageChoices } = require("../lib");
+const { ensureApplicationPackageSlice } = require("../lib/ensure-package-slice.cjs");
 
 const repoRoot = getRepoRoot();
 
@@ -22,13 +23,18 @@ module.exports = function registerApplicationFlowGenerator(plop) {
       },
     ],
     actions: (data) => {
-      const { flowName } = data;
+      const { packageName, flowName } = data;
       const flowKebab = toKebabCase(flowName);
       const interactionName = `${flowName}InteractionPort`;
       const interactionKebab = toKebabCase(interactionName);
 
       /** @type {import('plop').ActionType[]} */
       const actions = [];
+
+      actions.push(() => {
+        ensureApplicationPackageSlice(repoRoot, packageName, "ports");
+        ensureApplicationPackageSlice(repoRoot, packageName, "flows");
+      });
 
       // Add interaction port file (interface)
       actions.push({

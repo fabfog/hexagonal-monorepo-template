@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const { toKebabCase, toConstantCase } = require("./casing.cjs");
+const { ensureDomainPackageSlice } = require("./ensure-package-slice.cjs");
 
 /**
  * Naming for `{EntityPascal}NotFoundError` (e.g. User → UserNotFoundError, file user-not-found.error.ts).
@@ -73,15 +74,10 @@ function appendEnsureEntityNotFoundErrorActions(actions, opts) {
     "errors",
     `${nf.fileKebab}.error.ts`
   );
-  const errorsIndexAbs = path.join(
-    repoRoot,
-    "packages",
-    "domain",
-    domainPackage,
-    "src",
-    "errors",
-    "index.ts"
-  );
+
+  actions.unshift(() => {
+    ensureDomainPackageSlice(repoRoot, domainPackage, "errors");
+  });
 
   if (!fs.existsSync(errorAbsPath)) {
     actions.push({
@@ -91,19 +87,9 @@ function appendEnsureEntityNotFoundErrorActions(actions, opts) {
     });
   }
 
-  if (!fs.existsSync(errorsIndexAbs)) {
-    actions.push({
-      type: "add",
-      path: errorsIndexRel,
-      template: appendDomainErrorsBarrelExport("", nf.fileKebab),
-      skipIfExists: true,
-    });
-  }
-
   actions.push({
     type: "modify",
     path: errorsIndexRel,
-    skip: () => !fs.existsSync(errorsIndexAbs),
     transform: (file) => appendDomainErrorsBarrelExport(file, nf.fileKebab),
   });
 }

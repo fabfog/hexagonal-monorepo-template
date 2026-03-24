@@ -1,4 +1,5 @@
 const { getRepoRoot, toKebabCase, getApplicationPackageChoices } = require("../lib");
+const { ensureApplicationPackageSlice } = require("../lib/ensure-package-slice.cjs");
 
 const repoRoot = getRepoRoot();
 
@@ -22,11 +23,15 @@ module.exports = function registerApplicationUseCaseGenerator(plop) {
       },
     ],
     actions: (data) => {
-      const { useCaseName } = data;
+      const { packageName, useCaseName } = data;
       const kebab = toKebabCase(useCaseName);
 
       /** @type {import('plop').ActionType[]} */
       const actions = [];
+
+      actions.push(() => {
+        ensureApplicationPackageSlice(repoRoot, packageName, "use-cases");
+      });
 
       // Add use-case file
       actions.push({

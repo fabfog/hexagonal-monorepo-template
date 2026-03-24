@@ -4,6 +4,7 @@ const {
   getDomainPackageChoices,
   getDomainEntityChoices,
 } = require("../lib");
+const { ensureDomainPackageSlice } = require("../lib/ensure-package-slice.cjs");
 
 const repoRoot = getRepoRoot();
 
@@ -49,6 +50,10 @@ module.exports = function registerDomainServiceGenerator(plop) {
 
       /** @type {import('plop').ActionType[]} */
       const actions = [];
+
+      actions.push(() => {
+        ensureDomainPackageSlice(repoRoot, domainPackage, "services");
+      });
 
       actions.push({
         type: "add",
