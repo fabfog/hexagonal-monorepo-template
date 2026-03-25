@@ -21,6 +21,7 @@ const {
   DEMO_DRIVEN_REPO,
   DEMO_FEATURE,
   DEMO_FEATURE_DIR,
+  UPDATE_USE_CASE_NAME,
   getDemoMarkerPath,
   repoRootFromScriptsDemo,
 } = require("./demo-stack-config.cjs");
@@ -47,12 +48,12 @@ function assertCleanOrForce() {
 const STEPS = /** @type {DemoStep[]} */ ([
   {
     name: "domain-package",
-    note: "Bounded context package for the mini support-ticket model",
+    note: "Domain package for the demo support-ticket model",
     answers: { name: DEMO_DOMAIN },
   },
   {
     name: "domain-entity-zod",
-    note: "Ticket + TicketId VO + TicketNotFoundError (confirm pre-answered)",
+    note: "Ticket + TicketId VO + TicketNotFoundError",
     answers: {
       domainPackage: DEMO_DOMAIN,
       entityName: "Ticket",
@@ -77,7 +78,7 @@ const STEPS = /** @type {DemoStep[]} */ ([
   },
   {
     name: "application-use-case",
-    note: "Load a ticket (composed with repository later in real code)",
+    note: "Load a ticket",
     answers: {
       packageName: DEMO_APPLICATION,
       useCaseName: "GetTicketById",
@@ -85,10 +86,10 @@ const STEPS = /** @type {DemoStep[]} */ ([
   },
   {
     name: "application-use-case",
-    note: "Second use case for composition demos (client/server wiring)",
+    note: "Update a ticket",
     answers: {
       packageName: DEMO_APPLICATION,
-      useCaseName: "LogSupportDemoEvent",
+      useCaseName: UPDATE_USE_CASE_NAME,
     },
   },
   {
@@ -108,7 +109,7 @@ const STEPS = /** @type {DemoStep[]} */ ([
   },
   {
     name: "composition-package",
-    note: "Composition shell (runtime entry points added with the feature step)",
+    note: "Composition root",
     answers: { name: DEMO_COMPOSITION },
   },
   {
@@ -122,7 +123,7 @@ const STEPS = /** @type {DemoStep[]} */ ([
   },
   {
     name: "composition-wire-use-case",
-    note: "Expose GetTicketById on server (RSC / server actions friendly)",
+    note: "Expose GetTicketById on server",
     answers: {
       compositionPackage: DEMO_COMPOSITION,
       featureName: DEMO_FEATURE_DIR,
@@ -133,23 +134,23 @@ const STEPS = /** @type {DemoStep[]} */ ([
   },
   {
     name: "composition-wire-use-case",
-    note: "Expose LogSupportDemoEvent on client bundle",
+    note: `Expose ${UPDATE_USE_CASE_NAME} on client bundle`,
     answers: {
       compositionPackage: DEMO_COMPOSITION,
       featureName: DEMO_FEATURE_DIR,
       runtimes: ["client"],
       applicationPackage: DEMO_APPLICATION,
-      useCaseName: "LogSupportDemoEvent",
+      useCaseName: UPDATE_USE_CASE_NAME,
     },
   },
   {
     name: "composition-wire-react-cache-dataloader",
-    note: "Per-request DataLoader registry on server (before repository infra wiring)",
+    note: "Per-request DataLoader registry on server",
     answers: { compositionPackage: DEMO_COMPOSITION },
   },
   {
     name: "composition-wire-infrastructure",
-    note: "Lazy TicketRepository on server infrastructure (needs get-data-loader-registry.ts)",
+    note: "Lazy TicketRepository on server infrastructure",
     answers: {
       compositionPackage: DEMO_COMPOSITION,
       runtimes: ["server"],
