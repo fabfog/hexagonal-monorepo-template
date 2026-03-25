@@ -43,10 +43,17 @@ function firstParamName(params) {
 /**
  * @param {{ name: string, params: string, returnType: string }[]} methods
  * @param {string} entityClassName
+ * @param {string} entityPascal e.g. Document
  * @param {string} entityKebab
  * @param {string} notFoundErrorClassName e.g. UserNotFoundError
  */
-function buildMethodBodies(methods, entityClassName, entityKebab, notFoundErrorClassName) {
+function buildMethodBodies(
+  methods,
+  entityClassName,
+  entityPascal,
+  entityKebab,
+  notFoundErrorClassName
+) {
   const usesBatchFetch = methods.some((m) => isGetByIdWithStringId(m, entityClassName));
   let code = "";
 
@@ -93,7 +100,10 @@ function buildMethodBodies(methods, entityClassName, entityKebab, notFoundErrorC
       .json<unknown>();
 
     const entities = this.mapRawBatchToEntities(raw);
-    const byId = new Map(entities.map((entity) => [entity.id, entity] as const));
+    // Domain entities store id as a value object; use the fast entity.id getter.
+    const byId = new Map(
+      entities.map((entity) => [entity.id, entity] as const)
+    );
 
     return ids.map((id) => {
       const entity = byId.get(id);
@@ -102,7 +112,7 @@ function buildMethodBodies(methods, entityClassName, entityKebab, notFoundErrorC
   }
 
   private mapRawBatchToEntities(_raw: unknown): ${entityClassName}[] {
-    // TODO use proper mapper
+    // TODO use proper mapper; ${entityPascal}Id is the entity id VO.
     return [];
   }
 `;
@@ -132,6 +142,7 @@ function buildRepositorySource(p) {
   const methodBodies = buildMethodBodies(
     methods,
     entityClassName,
+    entityPascal,
     entityKebab,
     notFoundSpec ? notFoundSpec.className : ""
   );
@@ -146,6 +157,7 @@ import type { KyInstance } from "ky";
 import type { ${interfaceName} } from "@application/${applicationPackage}/ports";
 import type { DataLoaderRegistry } from "@infrastructure/lib-dataloader";
 import type { ${entityClassName} } from "@domain/${domainPackage}/entities";
+import type { ${entityPascal}Id } from "@domain/${domainPackage}/value-objects";
 ${notFoundImport}
 export class ${className} implements ${interfaceName} {
   constructor(

@@ -14,18 +14,36 @@ export type {{pascalCase entityName}}Props = { id: {{pascalCase entityName}}Id }
   {{pascalCase entityName}}DataProps;
 
 export class {{pascalCase entityName}}Entity {
-  private readonly id: {{pascalCase entityName}}Id;
-  private readonly props: {{pascalCase entityName}}DataProps;
+  private readonly _id: {{pascalCase entityName}}Id;
+  private readonly _props: {{pascalCase entityName}}DataProps;
 
   constructor({ id, ...data }: {{pascalCase entityName}}Props) {
-    this.id = id;
-    this.props = {{pascalCase entityName}}Schema.parse(data);
+    this._id = id;
+    this._props = {{pascalCase entityName}}Schema.parse(data);
   }
 
-  getProps(): Readonly<{{pascalCase entityName}}Props> {
+  /**
+   * Fast access to the id string value (stored internally as a VO).
+   * Useful for repositories / mappers that only need the id.
+   */
+  get id(): string {
+    return this._id.value;
+  }
+
+  /**
+   * Fast access to the entity data props (excluding the `id` VO).
+   */
+  get props(): Readonly<{{pascalCase entityName}}DataProps> {
+    return this._props;
+  }
+
+  /**
+   * Object representation including the id VO.
+   */
+  toObject(): Readonly<{{pascalCase entityName}}Props> {
     return Object.freeze({
-      id: this.id,
-      ...this.props,
+      id: this._id,
+      ...this._props,
     });
   }
 }
