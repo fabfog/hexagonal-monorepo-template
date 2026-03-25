@@ -21,6 +21,7 @@ const {
   DEMO_DRIVEN_REPO,
   DEMO_FEATURE,
   DEMO_FEATURE_DIR,
+  GET_USE_CASE_NAME,
   UPDATE_USE_CASE_NAME,
   getDemoMarkerPath,
   repoRootFromScriptsDemo,
@@ -81,7 +82,18 @@ const STEPS = /** @type {DemoStep[]} */ ([
     note: "Load a ticket",
     answers: {
       packageName: DEMO_APPLICATION,
-      useCaseName: "GetTicketById",
+      useCaseName: GET_USE_CASE_NAME,
+    },
+  },
+  {
+    name: "application-add-dependency-to-use-case",
+    note: `Inject TicketRepository port into ${GET_USE_CASE_NAME} deps`,
+    answers: {
+      packageName: DEMO_APPLICATION,
+      useCaseName: GET_USE_CASE_NAME,
+      portApplicationPackage: DEMO_APPLICATION,
+      portFileName: "ticket.repository.port.ts",
+      portPropertyName: "ticketRepository",
     },
   },
   {
@@ -90,6 +102,17 @@ const STEPS = /** @type {DemoStep[]} */ ([
     answers: {
       packageName: DEMO_APPLICATION,
       useCaseName: UPDATE_USE_CASE_NAME,
+    },
+  },
+  {
+    name: "application-add-dependency-to-use-case",
+    note: `Inject TicketRepository port into ${UPDATE_USE_CASE_NAME} deps`,
+    answers: {
+      packageName: DEMO_APPLICATION,
+      useCaseName: UPDATE_USE_CASE_NAME,
+      portApplicationPackage: DEMO_APPLICATION,
+      portFileName: "ticket.repository.port.ts",
+      portPropertyName: "ticketRepository",
     },
   },
   {
@@ -123,13 +146,13 @@ const STEPS = /** @type {DemoStep[]} */ ([
   },
   {
     name: "composition-wire-use-case",
-    note: "Expose GetTicketById on server",
+    note: `Expose ${GET_USE_CASE_NAME} on server`,
     answers: {
       compositionPackage: DEMO_COMPOSITION,
       featureName: DEMO_FEATURE_DIR,
       runtimes: ["server"],
       applicationPackage: DEMO_APPLICATION,
-      useCaseName: "GetTicketById",
+      useCaseName: GET_USE_CASE_NAME,
     },
   },
   {

@@ -8,6 +8,8 @@ const registerApplicationPackageGenerator = require("./generators/application-pa
 const registerApplicationUseCaseGenerator = require("./generators/application-use-case.cjs");
 const registerApplicationPortGenerator = require("./generators/application-port.cjs");
 const registerApplicationFlowGenerator = require("./generators/application-flow.cjs");
+const registerApplicationAddDependencyToUseCaseGenerator = require("./generators/application-add-dependency-to-use-case.cjs");
+const registerApplicationAddDependencyToFlowGenerator = require("./generators/application-add-dependency-to-flow.cjs");
 const registerApplicationEntityToDtoMapperGenerator = require("./generators/application-entity-to-dto-mapper.cjs");
 
 const registerInfrastructureDrivenAdapterPackageGenerator = require("./generators/infrastructure-driven-adapter-package.cjs");
@@ -45,6 +47,8 @@ function registerGeneratorsForLayers(plop, includedLayers) {
     registerApplicationPortGenerator(plop);
     registerApplicationUseCaseGenerator(plop);
     registerApplicationFlowGenerator(plop);
+    registerApplicationAddDependencyToUseCaseGenerator(plop);
+    registerApplicationAddDependencyToFlowGenerator(plop);
   }
 
   if (includedLayers.includes("Infrastructure")) {

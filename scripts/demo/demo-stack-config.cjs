@@ -10,6 +10,7 @@ const DEMO_COMPOSITION = "demo-web";
 const DEMO_DRIVEN_REPO = "driven-repository-demo-support";
 const DEMO_FEATURE = "SupportInbox";
 const DEMO_FEATURE_DIR = "support-inbox";
+const GET_USE_CASE_NAME = "GetTicketById";
 const UPDATE_USE_CASE_NAME = "UpdateTicket";
 
 function repoRootFromScriptsDemo() {
@@ -43,6 +44,7 @@ module.exports = {
   DEMO_DRIVEN_REPO,
   DEMO_FEATURE,
   DEMO_FEATURE_DIR,
+  GET_USE_CASE_NAME,
   UPDATE_USE_CASE_NAME,
   getDemoPackageAbsPaths,
   getDemoMarkerPath,
