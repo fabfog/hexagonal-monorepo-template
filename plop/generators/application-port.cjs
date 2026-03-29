@@ -13,7 +13,7 @@ const repoRoot = getRepoRoot();
 module.exports = function registerApplicationPortGenerator(plop) {
   plop.setGenerator("application-port", {
     description:
-      "Add a new Port or InteractionPort to an existing @application/* package (repository ports get a minimal getById signature)",
+      "Add a new Port or InteractionPort to an existing @application/* package (repository ports get getById(id: EntityId))",
     prompts: [
       {
         type: "list",
@@ -123,6 +123,7 @@ module.exports = function registerApplicationPortGenerator(plop) {
           isRepositoryPort,
           getByIdReturnType,
           domainPackageForEntity,
+          entityPascal,
         },
       });
 

@@ -18,6 +18,24 @@ const {
 
 const repoRoot = getRepoRoot();
 
+function escapeRegExp(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * @param {{ name: string, params: string, returnType: string }} method
+ * @param {string} entityClassName e.g. DocumentEntity
+ * @param {string} entityPascal e.g. Document (for TicketId)
+ */
+function isGetByIdWithVoId(method, entityClassName, entityPascal) {
+  if (method.name !== "getById") return false;
+  const first = method.params.split(",")[0]?.trim() ?? "";
+  const idTypePattern = new RegExp(`:\\s*${escapeRegExp(entityPascal)}Id\\s*$`);
+  if (!idTypePattern.test(first)) return false;
+  if (!method.returnType.includes("Promise")) return false;
+  return method.returnType.includes(entityClassName);
+}
+
 /**
  * @param {{ name: string, params: string, returnType: string }} method
  * @param {string} entityClassName e.g. DocumentEntity
@@ -29,6 +47,19 @@ function isGetByIdWithStringId(method, entityClassName) {
   if (!/:\s*string\s*$/.test(first)) return false;
   if (!method.returnType.includes("Promise")) return false;
   return method.returnType.includes(entityClassName);
+}
+
+/**
+ * @param {{ name: string, params: string, returnType: string }[]} methods
+ * @param {string} entityClassName
+ * @param {string} entityPascal
+ */
+function usesGetByIdBatch(methods, entityClassName, entityPascal) {
+  return methods.some(
+    (m) =>
+      isGetByIdWithVoId(m, entityClassName, entityPascal) ||
+      isGetByIdWithStringId(m, entityClassName)
+  );
 }
 
 /**
@@ -54,11 +85,27 @@ function buildMethodBodies(
   entityKebab,
   notFoundErrorClassName
 ) {
-  const usesBatchFetch = methods.some((m) => isGetByIdWithStringId(m, entityClassName));
+  const usesBatchFetch = usesGetByIdBatch(methods, entityClassName, entityPascal);
   let code = "";
 
   for (const method of methods) {
-    if (isGetByIdWithStringId(method, entityClassName)) {
+    if (isGetByIdWithVoId(method, entityClassName, entityPascal)) {
+      const idParam = firstParamName(method.params);
+      code += `
+  async ${method.name}(${method.params}): ${method.returnType} {
+    const loader = this.deps.loaders.getOrCreate(
+      "${entityKebab}.byId",
+      () =>
+        new DataLoader<${entityPascal}Id, ${entityClassName}, string>(
+          async (ids) => this.fetchManyByIds(ids.map((k) => k.value)),
+          { cacheKeyFn: (key) => key.value }
+        )
+    );
+
+    return loader.load(${idParam});
+  }
+`;
+    } else if (isGetByIdWithStringId(method, entityClassName)) {
       const idParam = firstParamName(method.params);
       code += `
   async ${method.name}(${method.params}): ${method.returnType} {
@@ -91,7 +138,7 @@ function buildMethodBodies(
 
     const raw = await this.deps.httpClient
       // FIXME replace with real fetch details
-      .post("documents/batch", {
+      .post("${entityKebab}", {
         json: { ids },
         headers: {
           "x-correlation-id": correlationId,
@@ -137,7 +184,8 @@ function buildRepositorySource(p) {
 
   const entityKebab = toKebabCase(entityPascal);
   const className = `${toPascalCase(repositoryBaseName)}Repository`;
-  const usesBatchFetch = methods.some((m) => isGetByIdWithStringId(m, entityClassName));
+  const usesBatchFetch = usesGetByIdBatch(methods, entityClassName, entityPascal);
+  const usesVoIdOnPort = methods.some((m) => isGetByIdWithVoId(m, entityClassName, entityPascal));
   const notFoundSpec = usesBatchFetch ? getEntityNotFoundErrorSpec(entityPascal) : null;
   const methodBodies = buildMethodBodies(
     methods,
@@ -150,6 +198,9 @@ function buildRepositorySource(p) {
   const notFoundImport = notFoundSpec
     ? `import { ${notFoundSpec.className} } from '@domain/${domainPackage}/errors';\n`
     : "";
+  const idVoImport = usesVoIdOnPort
+    ? `import type { ${entityPascal}Id } from "@domain/${domainPackage}/value-objects";\n`
+    : "";
 
   return `import DataLoader from "dataloader";
 import type { KyInstance } from "ky";
@@ -157,8 +208,7 @@ import type { KyInstance } from "ky";
 import type { ${interfaceName} } from "@application/${applicationPackage}/ports";
 import type { DataLoaderRegistry } from "@infrastructure/lib-dataloader";
 import type { ${entityClassName} } from "@domain/${domainPackage}/entities";
-import type { ${entityPascal}Id } from "@domain/${domainPackage}/value-objects";
-${notFoundImport}
+${idVoImport}${notFoundImport}
 export class ${className} implements ${interfaceName} {
   constructor(
     private readonly deps: {
@@ -282,7 +332,7 @@ module.exports = function registerDrivenRepositoryAddRepositoryGenerator(plop) {
       /** @type {import('plop').ActionType[]} */
       const actions = [];
 
-      const usesBatchFetch = methods.some((m) => isGetByIdWithStringId(m, entityClassName));
+      const usesBatchFetch = usesGetByIdBatch(methods, entityClassName, entityPascal);
       if (usesBatchFetch) {
         appendEnsureEntityNotFoundErrorActions(actions, {
           repoRoot,
