@@ -77,13 +77,15 @@ function firstParamName(params) {
  * @param {string} entityPascal e.g. Document
  * @param {string} entityKebab
  * @param {string} notFoundErrorClassName e.g. UserNotFoundError
+ * @param {boolean} useKyHttpClient
  */
 function buildMethodBodies(
   methods,
   entityClassName,
   entityPascal,
   entityKebab,
-  notFoundErrorClassName
+  notFoundErrorClassName,
+  useKyHttpClient
 ) {
   const usesBatchFetch = usesGetByIdBatch(methods, entityClassName, entityPascal);
   let code = "";
@@ -130,11 +132,8 @@ function buildMethodBodies(
   }
 
   if (usesBatchFetch) {
-    code += `
-  private async fetchManyByIds(
-    ids: string[]
-  ): Promise<(${entityClassName} | Error)[]> {
-    const correlationId = this.deps.getCorrelationId();
+    const fetchBlock = useKyHttpClient
+      ? `    const correlationId = this.deps.getCorrelationId();
 
     const raw = await this.deps.httpClient
       // FIXME replace with real fetch details
@@ -145,7 +144,16 @@ function buildMethodBodies(
         },
       })
       .json<unknown>();
+`
+      : `    // TODO: Batch-fetch \`ids\` via your SDK or data source.
+    const raw: unknown = undefined;
+`;
 
+    code += `
+  private async fetchManyByIds(
+    ids: string[]
+  ): Promise<(${entityClassName} | Error)[]> {
+${fetchBlock}
     const entities = this.mapRawBatchToEntities(raw);
     // Domain entities store id as a value object; use the fast entity.id getter.
     const byId = new Map(
@@ -180,6 +188,7 @@ function buildRepositorySource(p) {
     repositoryBaseName,
     interfaceName,
     methods,
+    useKyHttpClient,
   } = p;
 
   const entityKebab = toKebabCase(entityPascal);
@@ -192,7 +201,8 @@ function buildRepositorySource(p) {
     entityClassName,
     entityPascal,
     entityKebab,
-    notFoundSpec ? notFoundSpec.className : ""
+    notFoundSpec ? notFoundSpec.className : "",
+    useKyHttpClient
   );
 
   const notFoundImport = notFoundSpec
@@ -201,19 +211,18 @@ function buildRepositorySource(p) {
   const idVoImport = usesVoIdOnPort
     ? `import type { ${entityPascal}Id } from "@domain/${domainPackage}/value-objects";\n`
     : "";
+  const kyImport = useKyHttpClient ? `import type { KyInstance } from "ky";\n\n` : "";
+  const depsHttpClient = useKyHttpClient ? `      httpClient: KyInstance;\n` : "";
 
   return `import DataLoader from "dataloader";
-import type { KyInstance } from "ky";
-
-import type { ${interfaceName} } from "@application/${applicationPackage}/ports";
+${kyImport}import type { ${interfaceName} } from "@application/${applicationPackage}/ports";
 import type { DataLoaderRegistry } from "@infrastructure/lib-dataloader";
 import type { ${entityClassName} } from "@domain/${domainPackage}/entities";
 ${idVoImport}${notFoundImport}
 export class ${className} implements ${interfaceName} {
   constructor(
     private readonly deps: {
-      httpClient: KyInstance;
-      loaders: DataLoaderRegistry;
+${depsHttpClient}      loaders: DataLoaderRegistry;
       getCorrelationId: () => string;
     }
   ) {}
@@ -225,7 +234,7 @@ ${methodBodies}}
 module.exports = function registerDrivenRepositoryAddRepositoryGenerator(plop) {
   plop.setGenerator("driven-repository-add-repository", {
     description:
-      "Add a opinionated repository class (Ky + DataLoader) implementing an application port to a driven-repository-* package",
+      "Add a repository class (DataLoader + optional Ky) implementing an application port to a driven-repository-* package",
     prompts: [
       {
         type: "list",
@@ -260,6 +269,13 @@ module.exports = function registerDrivenRepositoryAddRepositoryGenerator(plop) {
           }
           return c;
         },
+      },
+      {
+        type: "confirm",
+        name: "useKyHttpClient",
+        default: true,
+        message:
+          "Include Ky HTTP client (`httpClient`) in generated code? Choose No if you will use an external SDK instead (e.g. Contentful):",
       },
       {
         type: "input",
@@ -301,6 +317,8 @@ module.exports = function registerDrivenRepositoryAddRepositoryGenerator(plop) {
         throw new Error(`No methods found in Port interface ${interfaceName} (file ${portFile}).`);
       }
 
+      const useKyHttpClient = data.useKyHttpClient !== false;
+
       const source = buildRepositorySource({
         applicationPackage,
         domainPackage,
@@ -309,6 +327,7 @@ module.exports = function registerDrivenRepositoryAddRepositoryGenerator(plop) {
         repositoryBaseName,
         interfaceName,
         methods,
+        useKyHttpClient,
       });
 
       const fileBase = `${toKebabCase(repositoryBaseName)}.repository`;
@@ -393,12 +412,13 @@ module.exports = function registerDrivenRepositoryAddRepositoryGenerator(plop) {
           const pkg = JSON.parse(file);
           pkg.dependencies = pkg.dependencies || {};
 
+          const useKy = data.useKyHttpClient !== false;
           const deps = {
             [`@application/${applicationPackage}`]: "workspace:*",
             [`@domain/${domainPackage}`]: "workspace:*",
             "@infrastructure/lib-dataloader": "workspace:*",
             dataloader: "^2.2.2",
-            ky: "^1.14.0",
+            ...(useKy ? { ky: "^1.14.0" } : {}),
           };
 
           for (const [name, spec] of Object.entries(deps)) {

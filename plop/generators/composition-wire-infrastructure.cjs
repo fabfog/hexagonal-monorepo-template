@@ -79,10 +79,11 @@ function ensureImportLines(src, importLines) {
  * @param {string} adapterClassName
  * @param {string} drivenPackage
  * @param {string} runtime
+ * @param {boolean} useKyHttpClient
  */
-function buildRepositoryImportLines(adapterClassName, drivenPackage, runtime) {
+function buildRepositoryImportLines(adapterClassName, drivenPackage, runtime, useKyHttpClient) {
   const lines = [
-    `import { createHttpClient } from "@infrastructure/lib-http";`,
+    ...(useKyHttpClient ? [`import { createHttpClient } from "@infrastructure/lib-http";`] : []),
     `import { ${adapterClassName} } from "@infrastructure/${drivenPackage}";`,
   ];
   if (runtime === "server") {
@@ -105,11 +106,12 @@ function buildRepositoryLoadersCall(runtime) {
 
 /**
  * @param {string} src
- * @param {{ infrastructureKey: string, cacheVarName: string, adapterClassName: string, drivenPackage: string, runtime?: string }} p
+ * @param {{ infrastructureKey: string, cacheVarName: string, adapterClassName: string, drivenPackage: string, runtime?: string, useKyHttpClient?: boolean }} p
  */
 function mergeInfrastructureFile(src, p) {
   const runtime = p.runtime ?? "server";
   const isRepo = isDrivenRepositoryPackage(p.drivenPackage);
+  const useKyHttpClient = p.useKyHttpClient !== false;
   const { infrastructureKey, cacheVarName, adapterClassName, drivenPackage } = p;
 
   const getterRe = new RegExp(`get\\s+${infrastructureKey}\\s*\\(`);
@@ -121,14 +123,21 @@ function mergeInfrastructureFile(src, p) {
 
   const importLine = `import { ${adapterClassName} } from "@infrastructure/${drivenPackage}";`;
 
-  const getterBlock = isRepo
-    ? `  get ${infrastructureKey}() {
-    if (${cacheVarName} === undefined) {
-      ${cacheVarName} = new ${adapterClassName}({
+  const repoDepsInner = useKyHttpClient
+    ? `{
         httpClient: createHttpClient(),
         loaders: ${buildRepositoryLoadersCall(runtime)},
         getCorrelationId: () => globalThis.crypto.randomUUID(),
-      });
+      }`
+    : `{
+        loaders: ${buildRepositoryLoadersCall(runtime)},
+        getCorrelationId: () => globalThis.crypto.randomUUID(),
+      }`;
+
+  const getterBlock = isRepo
+    ? `  get ${infrastructureKey}() {
+    if (${cacheVarName} === undefined) {
+      ${cacheVarName} = new ${adapterClassName}(${repoDepsInner});
     }
     return ${cacheVarName};
   }`
@@ -144,7 +153,9 @@ function mergeInfrastructureFile(src, p) {
 
   if (!updated.includes("export const infrastructure")) {
     const headerImports = isRepo
-      ? buildRepositoryImportLines(adapterClassName, drivenPackage, runtime).join("\n") + "\n"
+      ? buildRepositoryImportLines(adapterClassName, drivenPackage, runtime, useKyHttpClient).join(
+          "\n"
+        ) + "\n"
       : `${importLine}\n`;
     const letLine = `let ${cacheVarName}: ${adapterClassName} | undefined;`;
     return `${headerImports}\n${letLine}\n\nexport const infrastructure = {\n${getterBlock},\n};\n`;
@@ -153,7 +164,7 @@ function mergeInfrastructureFile(src, p) {
   if (isRepo) {
     updated = ensureImportLines(
       updated,
-      buildRepositoryImportLines(adapterClassName, drivenPackage, runtime)
+      buildRepositoryImportLines(adapterClassName, drivenPackage, runtime, useKyHttpClient)
     );
   } else if (!updated.includes(importLine)) {
     updated = insertAfterLastImport(updated, importLine);
@@ -187,7 +198,7 @@ function mergeInfrastructureFile(src, p) {
 module.exports = function registerCompositionWireInfrastructureGenerator(plop) {
   plop.setGenerator("composition-wire-infrastructure", {
     description:
-      "Wire a driven-* package into composition: lazy getters on infrastructure.ts + @infrastructure/* dependency. Repository packages get Ky + DataLoader + correlation wiring.",
+      "Wire a driven-* package into composition: lazy getters on infrastructure.ts + @infrastructure/* dependency. Repository packages get DataLoader + correlation; Ky is optional.",
     prompts: [
       {
         type: "list",
@@ -232,6 +243,14 @@ module.exports = function registerCompositionWireInfrastructureGenerator(plop) {
         validate: (value) => String(value || "").trim().length > 0 || "Class name cannot be empty",
         filter: (value) => String(value || "").trim(),
       },
+      {
+        type: "confirm",
+        name: "useKyHttpClient",
+        default: true,
+        message:
+          "Wire Ky HTTP client (`createHttpClient`) into this repository? Choose No if the adapter uses an SDK only (e.g. Contentful):",
+        when: (a) => isDrivenRepositoryPackage(String(a.drivenPackage || "")),
+      },
     ],
     actions: (data) => {
       const { compositionPackage, runtimes, drivenPackage, infrastructureKey, adapterClassName } =
@@ -239,6 +258,7 @@ module.exports = function registerCompositionWireInfrastructureGenerator(plop) {
 
       const cacheVarName = `_${infrastructureKey}Instance`;
       const isRepo = isDrivenRepositoryPackage(drivenPackage);
+      const useKyHttpClient = data.useKyHttpClient !== false;
 
       /** @type {import('plop').ActionType[]} */
       const actions = [];
@@ -261,7 +281,7 @@ module.exports = function registerCompositionWireInfrastructureGenerator(plop) {
           }
 
           if (isRepo) {
-            if (!pkg.dependencies["@infrastructure/lib-http"]) {
+            if (data.useKyHttpClient !== false && !pkg.dependencies["@infrastructure/lib-http"]) {
               pkg.dependencies["@infrastructure/lib-http"] = "workspace:*";
             }
             if (!pkg.dependencies["@infrastructure/lib-dataloader"]) {
@@ -287,6 +307,7 @@ module.exports = function registerCompositionWireInfrastructureGenerator(plop) {
               cacheVarName,
               adapterClassName,
               runtime,
+              useKyHttpClient,
             }),
         });
       }
