@@ -199,6 +199,22 @@ function parseRepositoryPortMetadata(source) {
 }
 
 /**
+ * Reads the repository Port interface name from source (export interface … {).
+ * Prefers a name ending with `RepositoryPort` when multiple interfaces exist.
+ * @param {string} source
+ * @returns {string}
+ */
+function parseRepositoryPortInterfaceName(source) {
+  const all = [...source.matchAll(/export\s+interface\s+(\w+)\s*\{/g)];
+  if (all.length === 0) {
+    throw new Error("Could not parse repository port: expected export interface Name { ... }");
+  }
+  const names = all.map((m) => m[1]);
+  const withSuffix = names.find((n) => n.endsWith("RepositoryPort"));
+  return withSuffix ?? names[0];
+}
+
+/**
  * @param {string} repoRoot
  * @param {string} applicationPackage
  */
@@ -539,6 +555,7 @@ module.exports = {
   getNormalPortChoices,
   getRepositoryPortChoices,
   parseRepositoryPortMetadata,
+  parseRepositoryPortInterfaceName,
   getInteractionPortChoices,
   readApplicationPortSource,
   getDomainEntityChoices,

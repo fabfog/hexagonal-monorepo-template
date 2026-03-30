@@ -9,6 +9,7 @@ const {
   getRepositoryPortChoices,
   readApplicationPortSource,
   parseRepositoryPortMetadata,
+  parseRepositoryPortInterfaceName,
   getDrivenRepositoryInfrastructurePackageChoices,
 } = require("../lib/index.cjs");
 const {
@@ -63,12 +64,51 @@ function usesGetByIdBatch(methods, entityClassName, entityPascal) {
 }
 
 /**
+ * @param {{ name: string, params: string, returnType: string }[]} methods
+ * @param {string} entityClassName
+ * @param {string} entityPascal
+ * @returns {"vo" | "string" | null}
+ */
+function getBatchGetByIdKind(methods, entityClassName, entityPascal) {
+  if (methods.some((m) => isGetByIdWithVoId(m, entityClassName, entityPascal))) {
+    return "vo";
+  }
+  if (methods.some((m) => isGetByIdWithStringId(m, entityClassName))) {
+    return "string";
+  }
+  return null;
+}
+
+/**
  * @param {string} params "documentId: string" -> "documentId"
  */
 function firstParamName(params) {
   const first = params.split(",")[0]?.trim() ?? "";
   const m = first.match(/^(\w+)\s*:/);
   return m ? m[1] : "id";
+}
+
+/**
+ * @param {"vo" | "string"} kind
+ */
+function buildCreateByIdLoaderMethod(kind, entityPascal, entityClassName) {
+  if (kind === "vo") {
+    return `
+  private createByIdLoader(): DataLoader<${entityPascal}Id, ${entityClassName}, string> {
+    return new DataLoader<${entityPascal}Id, ${entityClassName}, string>(
+      async (ids) => this.fetchManyByIds(ids.map((k) => k.value)),
+      { cacheKeyFn: (key) => key.value }
+    );
+  }
+`;
+  }
+  return `
+  private createByIdLoader(): DataLoader<string, ${entityClassName}> {
+    return new DataLoader<string, ${entityClassName}>(async (ids: string[]) => {
+      return this.fetchManyByIds([...ids]);
+    });
+  }
+`;
 }
 
 /**
@@ -88,6 +128,8 @@ function buildMethodBodies(
   useKyHttpClient
 ) {
   const usesBatchFetch = usesGetByIdBatch(methods, entityClassName, entityPascal);
+  const getByIdKind = getBatchGetByIdKind(methods, entityClassName, entityPascal);
+
   let code = "";
 
   for (const method of methods) {
@@ -95,31 +137,14 @@ function buildMethodBodies(
       const idParam = firstParamName(method.params);
       code += `
   async ${method.name}(${method.params}): ${method.returnType} {
-    const loader = this.deps.loaders.getOrCreate(
-      "${entityKebab}.byId",
-      () =>
-        new DataLoader<${entityPascal}Id, ${entityClassName}, string>(
-          async (ids) => this.fetchManyByIds(ids.map((k) => k.value)),
-          { cacheKeyFn: (key) => key.value }
-        )
-    );
-
-    return loader.load(${idParam});
+    return this.byIdLoader.load(${idParam});
   }
 `;
     } else if (isGetByIdWithStringId(method, entityClassName)) {
       const idParam = firstParamName(method.params);
       code += `
   async ${method.name}(${method.params}): ${method.returnType} {
-    const loader = this.deps.loaders.getOrCreate(
-      "${entityKebab}.byId",
-      () =>
-        new DataLoader<string, ${entityClassName}>(async (ids: string[]) => {
-          return this.fetchManyByIds([...ids]);
-        })
-    );
-
-    return loader.load(${idParam});
+    return this.byIdLoader.load(${idParam});
   }
 `;
     } else {
@@ -129,6 +154,10 @@ function buildMethodBodies(
   }
 `;
     }
+  }
+
+  if (usesBatchFetch && getByIdKind) {
+    code += buildCreateByIdLoaderMethod(getByIdKind, entityPascal, entityClassName);
   }
 
   if (usesBatchFetch) {
@@ -166,6 +195,7 @@ ${fetchBlock}
     });
   }
 
+  // TODO: handle unknown type: validate incoming data, map to entities
   private mapRawBatchToEntities(_raw: unknown): ${entityClassName}[] {
     // TODO use proper mapper; ${entityPascal}Id is the entity id VO.
     return [];
@@ -211,22 +241,73 @@ function buildRepositorySource(p) {
   const idVoImport = usesVoIdOnPort
     ? `import type { ${entityPascal}Id } from "@domain/${domainPackage}/value-objects";\n`
     : "";
-  const kyImport = useKyHttpClient ? `import type { KyInstance } from "ky";\n\n` : "";
+  const kyImport = useKyHttpClient ? `import type { KyInstance } from "ky";\n` : "";
   const depsHttpClient = useKyHttpClient ? `      httpClient: KyInstance;\n` : "";
 
-  return `import DataLoader from "dataloader";
-${kyImport}import type { ${interfaceName} } from "@application/${applicationPackage}/ports";
-import type { DataLoaderRegistry } from "@infrastructure/lib-dataloader";
-import type { ${entityClassName} } from "@domain/${domainPackage}/entities";
-${idVoImport}${notFoundImport}
-export class ${className} implements ${interfaceName} {
-  constructor(
+  const batchKind = getBatchGetByIdKind(methods, entityClassName, entityPascal);
+  const byIdHandleType =
+    batchKind === "vo"
+      ? `IdleDataLoaderHandle<${entityPascal}Id, ${entityClassName}, string>`
+      : batchKind === "string"
+        ? `IdleDataLoaderHandle<string, ${entityClassName}>`
+        : "";
+
+  const infraImports = usesBatchFetch
+    ? `import DataLoader from "dataloader";
+import {
+  createIdleDataLoader,
+  type DataLoaderRegistry,
+  type IdleDataLoaderHandle,
+} from "@infrastructure/lib-dataloader";
+`
+    : `import type { DataLoaderRegistry } from "@infrastructure/lib-dataloader";
+`;
+
+  const byIdLoaderKeyConst = usesBatchFetch
+    ? `const BY_ID_LOADER_KEY = "${entityKebab}.byId";
+
+`
+    : "";
+
+  const byIdLoaderField = usesBatchFetch
+    ? `  private readonly byIdLoader: ${byIdHandleType};
+
+`
+    : "";
+
+  const constructorBlock = usesBatchFetch
+    ? `  constructor(
+    private readonly deps: {
+${depsHttpClient}      loaders: DataLoaderRegistry;
+      getCorrelationId: () => string;
+      /**
+       * Optional: clear the by-id DataLoader cache after this many ms without a getById call
+       * (long-lived client registries). Omit on server unless you want this behaviour.
+       */
+      dataLoaderIdleMs?: number;
+    }
+  ) {
+    this.byIdLoader = createIdleDataLoader({
+      registry: deps.loaders,
+      loaderKey: BY_ID_LOADER_KEY,
+      factory: () => this.createByIdLoader(),
+      idleMs: deps.dataLoaderIdleMs,
+    });
+  }
+`
+    : `  constructor(
     private readonly deps: {
 ${depsHttpClient}      loaders: DataLoaderRegistry;
       getCorrelationId: () => string;
     }
   ) {}
-${methodBodies}}
+`;
+
+  return `${infraImports}${kyImport ? `${kyImport}\n` : ""}import type { ${interfaceName} } from "@application/${applicationPackage}/ports";
+import type { ${entityClassName} } from "@domain/${domainPackage}/entities";
+${idVoImport}${notFoundImport}
+${byIdLoaderKeyConst}export class ${className} implements ${interfaceName} {
+${byIdLoaderField}${constructorBlock}${methodBodies}}
 `;
 }
 
@@ -234,7 +315,7 @@ ${methodBodies}}
 module.exports = function registerDrivenRepositoryAddRepositoryGenerator(plop) {
   plop.setGenerator("driven-repository-add-repository", {
     description:
-      "Add a repository class (DataLoader + optional Ky) implementing an application port to a driven-repository-* package",
+      "Add a repository (createIdleDataLoader + optional Ky) implementing an application port to a driven-repository-* package",
     prompts: [
       {
         type: "list",
@@ -308,9 +389,7 @@ module.exports = function registerDrivenRepositoryAddRepositoryGenerator(plop) {
         );
       }
 
-      // Port file is `{entity-kebab}.repository.port.ts` (see application-port); interface is still
-      // `{RepositoryBase}RepositoryPort` (e.g. TicketRepositoryPort), not `{Entity}Port`.
-      const interfaceName = `${repositoryBaseName}RepositoryPort`;
+      const interfaceName = parseRepositoryPortInterfaceName(portSource);
       const methods = parseInterfaceMethods(portSource, interfaceName);
 
       if (!methods.length) {
