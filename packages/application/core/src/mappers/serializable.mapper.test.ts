@@ -16,6 +16,10 @@ describe("mapSerializableToDTO", () => {
       expect(mapSerializableToDTO(false)).toBe(false);
       expect(mapSerializableToDTO(BigInt(7))).toBe(BigInt(7));
     });
+
+    it("throws when root input is a function", () => {
+      expect(() => mapSerializableToDTO(() => 1)).toThrow("Functions are not serializable.");
+    });
   });
 
   describe("Date", () => {
@@ -136,7 +140,63 @@ describe("mapSerializableToDTO", () => {
       });
     });
 
-    it("includes symbol keys from Reflect.ownKeys", () => {
+    it("filters function properties from plain objects", () => {
+      const out = mapSerializableToDTO({
+        id: "x",
+        callback: () => "should be removed",
+        nested: {
+          keep: 1,
+          run: () => 42,
+        },
+      });
+
+      expect(out).toEqual({
+        id: "x",
+        nested: { keep: 1 },
+      });
+    });
+
+    it("throws when an array contains a function (collections must be data-only)", () => {
+      expect(() => mapSerializableToDTO([1, () => 2, "x"])).toThrow(
+        "Functions are not serializable outside plain object properties"
+      );
+    });
+
+    it("throws when a Map key or value is a function", () => {
+      expect(() =>
+        mapSerializableToDTO(
+          new Map<unknown, unknown>([
+            ["ok", 1],
+            [() => "bad-key", 2],
+          ])
+        )
+      ).toThrow("Functions are not serializable outside plain object properties");
+
+      expect(() =>
+        mapSerializableToDTO(
+          new Map<unknown, unknown>([
+            ["ok", 1],
+            ["bad-value", () => 3],
+          ])
+        )
+      ).toThrow("Functions are not serializable outside plain object properties");
+    });
+
+    it("throws when a Set contains a function", () => {
+      expect(() => mapSerializableToDTO(new Set<unknown>([1, () => 2, "x"]))).toThrow(
+        "Functions are not serializable outside plain object properties"
+      );
+    });
+
+    it("throws when a nested array under an object contains a function", () => {
+      expect(() =>
+        mapSerializableToDTO({
+          items: [1, () => 2],
+        })
+      ).toThrow("Functions are not serializable outside plain object properties");
+    });
+
+    it("filters symbol keys from plain objects (DTO is JSON-oriented)", () => {
       const sym = Symbol("s");
       const input: Record<PropertyKey, number> = {};
       input[sym] = 99;
@@ -144,7 +204,7 @@ describe("mapSerializableToDTO", () => {
 
       const out = mapSerializableToDTO(input) as Record<PropertyKey, unknown>;
       expect(out.a).toBe(1);
-      expect(out[sym]).toBe(99);
+      expect(sym in out).toBe(false);
     });
   });
 
