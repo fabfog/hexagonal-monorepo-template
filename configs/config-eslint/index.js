@@ -222,6 +222,27 @@ const config = defineConfig(
       ],
     },
   },
+  {
+    files: [
+      "packages/domain/**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}",
+      "packages/application/**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}",
+    ],
+    rules: {
+      "no-restricted-globals": [
+        "error",
+        {
+          name: "process",
+          message:
+            "Do not use `process` in domain or application packages; inject Node/platform concerns from composition or infrastructure.",
+        },
+        {
+          name: "globalThis",
+          message:
+            "Do not use `globalThis` in domain or application packages; keep code free of global runtime access.",
+        },
+      ],
+    },
+  },
   // Disable any formatting rules that could conflict with Prettier
   prettierConfig,
   {
