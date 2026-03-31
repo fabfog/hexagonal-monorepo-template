@@ -1,10 +1,11 @@
 import type { {{pascalCase entityName}}Entity } from '@domain/{{packageName}}/entities';
 import type { {{pascalCase entityName}}DTO } from '../dtos/{{kebabCase entityName}}.dto';
+import { mapSerializableToDTO } from '@application/core/mappers';
 
 export function map{{pascalCase entityName}}ToDTO(
   entity: {{pascalCase entityName}}Entity
 ): {{pascalCase entityName}}DTO {
-  const object = entity.toObject();
+  const object = mapSerializableToDTO(entity);
   // TODO: map from props to DTO
   return {};
 }

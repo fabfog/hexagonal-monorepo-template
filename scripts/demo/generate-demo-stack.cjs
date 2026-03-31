@@ -9,6 +9,9 @@
  * v1 is intentionally minimal: support-style Ticket + repository adapter + composition
  * (isomorphic / server / client) + DataLoader wiring. No secondary Port + driven-port-adapter
  * yet (empty "other" ports break that generator until the port defines methods).
+ *
+ * After the Ticket entity, the demo also scaffolds one example VO per kind (single-value:
+ * string / boolean / number / Date, plus one composite VO) under @domain/demo-support.
  */
 
 const fs = require("fs");
@@ -59,6 +62,55 @@ const STEPS = /** @type {DemoStep[]} */ ([
       domainPackage: DEMO_DOMAIN,
       entityName: "Ticket",
       addNotFoundError: true,
+    },
+  },
+  {
+    name: "domain-value-object-zod",
+    note: "Example single-value VO (string) for docs / onboarding",
+    answers: {
+      domainPackage: DEMO_DOMAIN,
+      valueObjectName: "DemoString",
+      valueObjectKind: "single-value",
+      singleValuePrimitive: "string",
+    },
+  },
+  {
+    name: "domain-value-object-zod",
+    note: "Example single-value VO (boolean)",
+    answers: {
+      domainPackage: DEMO_DOMAIN,
+      valueObjectName: "DemoBoolean",
+      valueObjectKind: "single-value",
+      singleValuePrimitive: "boolean",
+    },
+  },
+  {
+    name: "domain-value-object-zod",
+    note: "Example single-value VO (number)",
+    answers: {
+      domainPackage: DEMO_DOMAIN,
+      valueObjectName: "DemoNumber",
+      valueObjectKind: "single-value",
+      singleValuePrimitive: "number",
+    },
+  },
+  {
+    name: "domain-value-object-zod",
+    note: "Example single-value VO (Date)",
+    answers: {
+      domainPackage: DEMO_DOMAIN,
+      valueObjectName: "DemoDate",
+      valueObjectKind: "single-value",
+      singleValuePrimitive: "Date",
+    },
+  },
+  {
+    name: "domain-value-object-zod",
+    note: "Example composite VO (z.object + getProps + deepEqual equals)",
+    answers: {
+      domainPackage: DEMO_DOMAIN,
+      valueObjectName: "DemoComposite",
+      valueObjectKind: "composite",
     },
   },
   {

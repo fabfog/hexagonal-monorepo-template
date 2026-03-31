@@ -50,7 +50,8 @@ module.exports = function registerDomainEntityZodGenerator(plop) {
         repoRoot,
         domainPackage,
         valueObjectName: `${entityPascal}Id`,
-        valueObjectKind: "string",
+        valueObjectKind: "single-value",
+        singleValuePrimitive: "string",
       });
 
       actions.push(() => {

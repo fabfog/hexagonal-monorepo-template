@@ -5,20 +5,40 @@ const { ensureDomainPackageSlice } = require("./ensure-package-slice.cjs");
  * Appends the same "add .vo.ts + patch value-objects/index.ts" steps as generator `domain-value-object-zod`.
  *
  * @param {unknown[]} actions
- * @param {{ repoRoot: string, domainPackage: string, valueObjectName: string, valueObjectKind?: 'string' | 'object' }} opts
+ * @param {{ repoRoot: string, domainPackage: string, valueObjectName: string, valueObjectKind?: 'single-value' | 'composite', singleValuePrimitive?: 'string' | 'boolean' | 'number' | 'Date' }} opts
  */
 function appendDomainValueObjectZodActions(actions, opts) {
   const { repoRoot, domainPackage, valueObjectName } = opts;
   if (!repoRoot) {
     throw new Error("appendDomainValueObjectZodActions requires repoRoot");
   }
-  const valueObjectKind = opts.valueObjectKind ?? "string";
+  const valueObjectKind = opts.valueObjectKind ?? "single-value";
+  const singleValuePrimitive = opts.singleValuePrimitive ?? "string";
   const kebab = toKebabCase(valueObjectName);
-  const voData = { domainPackage, valueObjectName, valueObjectKind };
+  const primitiveSchemaByType = {
+    string: "z.string().min(1)",
+    boolean: "z.boolean()",
+    number: "z.number()",
+    Date: "z.date()",
+  };
+  const equalsBodyByType = {
+    string: "return other.value === this.value;",
+    boolean: "return other.value === this.value;",
+    number: "return other.value === this.value;",
+    Date: "return other.value.getTime() === this.value.getTime();",
+  };
+  const voData = {
+    domainPackage,
+    valueObjectName,
+    valueObjectKind,
+    singleValuePrimitive,
+    singleValueSchema: primitiveSchemaByType[singleValuePrimitive],
+    singleValueEqualsBody: equalsBodyByType[singleValuePrimitive],
+  };
   const templateFile =
-    valueObjectKind === "object"
-      ? "templates/domain-value-object-zod/value-object-object.ts.hbs"
-      : "templates/domain-value-object-zod/value-object-string.ts.hbs";
+    valueObjectKind === "composite"
+      ? "templates/domain-value-object-zod/value-object-composite.ts.hbs"
+      : "templates/domain-value-object-zod/value-object-single-value.ts.hbs";
 
   actions.unshift(() => {
     ensureDomainPackageSlice(repoRoot, domainPackage, "value-objects");
