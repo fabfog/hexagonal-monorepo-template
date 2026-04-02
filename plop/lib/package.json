@@ -1,5 +1,6 @@
 {
   "name": "@repo/plop-lib",
+  "description": "So require(\"../lib\") loads index.cjs (Node defaults to index.js only without a \"main\" field). Not listed in pnpm-workspace.",
   "private": true,
   "type": "commonjs",
   "main": "index.cjs"

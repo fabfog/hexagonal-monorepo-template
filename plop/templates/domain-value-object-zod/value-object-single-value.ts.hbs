@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { SERIALIZE } from '@domain/core/utils';
 
 export const {{pascalCase valueObjectName}}Schema = {{{singleValueSchema}}};
 
@@ -21,9 +20,5 @@ export class {{pascalCase valueObjectName}} {
 
   equals(other: {{pascalCase valueObjectName}}): boolean {
     {{{singleValueEqualsBody}}}
-  }
-
-  [SERIALIZE](): {{singleValuePrimitive}} {
-    return this.value;
   }
 }

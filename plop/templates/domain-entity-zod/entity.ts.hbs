@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { SERIALIZE } from '@domain/core/utils';
 
 import { {{pascalCase entityName}}Id } from '../value-objects/{{kebabCase entityName}}-id.vo';
 
@@ -38,7 +37,8 @@ export class {{pascalCase entityName}}Entity {
     return this._props;
   }
 
-  [SERIALIZE](): Readonly<{{pascalCase entityName}}Props> {
+  /** Snapshot for mappers / APIs (nested value objects are still VOs; use `.value` where you need primitives). */
+  toSnapshot(): Readonly<{{pascalCase entityName}}Props> {
     return Object.freeze({
       id: this._id,
       ...this._props,

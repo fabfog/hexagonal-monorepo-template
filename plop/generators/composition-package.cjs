@@ -2,7 +2,7 @@
 module.exports = function registerCompositionPackageGenerator(plop) {
   plop.setGenerator("composition-package", {
     description:
-      "Create a new composition package shell (@composition/<name>). Runtime folders (isomorphic / server / client) and package.json exports are added when you run composition-feature-dependencies (per selected runtimes).",
+      "Create a new @composition/<name> package: package.json (single entry export), tsconfig.json, src/types.ts, src/infrastructure.ts, src/index.ts (get<PascalCase>Modules(ctx) stub; infrastructureProvider non re-exported).",
     prompts: [
       {
         type: "input",
@@ -24,8 +24,18 @@ module.exports = function registerCompositionPackageGenerator(plop) {
       },
       {
         type: "add",
-        path: "../packages/composition/{{kebabCase name}}/src/.gitkeep",
-        template: "",
+        path: "../packages/composition/{{kebabCase name}}/src/types.ts",
+        templateFile: "templates/composition-package/src/types.ts.hbs",
+      },
+      {
+        type: "add",
+        path: "../packages/composition/{{kebabCase name}}/src/infrastructure.ts",
+        templateFile: "templates/composition-package/src/infrastructure.ts.hbs",
+      },
+      {
+        type: "add",
+        path: "../packages/composition/{{kebabCase name}}/src/index.ts",
+        templateFile: "templates/composition-package/src/index.ts.hbs",
       },
     ],
   });

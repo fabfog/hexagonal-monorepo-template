@@ -11,6 +11,8 @@ const registerApplicationFlowGenerator = require("./generators/application-flow.
 const registerApplicationAddDependencyToUseCaseGenerator = require("./generators/application-add-dependency-to-use-case.cjs");
 const registerApplicationAddDependencyToFlowGenerator = require("./generators/application-add-dependency-to-flow.cjs");
 const registerApplicationEntityToDtoMapperGenerator = require("./generators/application-entity-to-dto-mapper.cjs");
+const registerApplicationModuleGenerator = require("./generators/application-module.cjs");
+const registerApplicationWireModuleGenerator = require("./generators/application-wire-module.cjs");
 
 const registerInfrastructureDrivenAdapterPackageGenerator = require("./generators/infrastructure-driven-adapter-package.cjs");
 const registerInfrastructureLibPackageGenerator = require("./generators/infrastructure-lib-package.cjs");
@@ -20,12 +22,6 @@ const registerDrivenRepositoryAddRepositoryGenerator = require("./generators/dri
 const registerInfrastructureRawToDomainEntityMapperGenerator = require("./generators/infrastructure-raw-to-domain-entity-mapper.cjs");
 
 const registerCompositionPackageGenerator = require("./generators/composition-package.cjs");
-const registerCompositionFeatureDependenciesGenerator = require("./generators/composition-feature-dependencies.cjs");
-const registerCompositionWireUseCaseGenerator = require("./generators/composition-wire-use-case.cjs");
-const registerCompositionWireFlowGenerator = require("./generators/composition-wire-flow.cjs");
-const registerCompositionWireInfrastructureGenerator = require("./generators/composition-wire-infrastructure.cjs");
-const registerCompositionWireReactCacheDataloaderGenerator = require("./generators/composition-wire-react-cache-dataloader.cjs");
-
 const registerUiPackageGenerator = require("./generators/ui-package.cjs");
 
 /**
@@ -47,6 +43,8 @@ function registerGeneratorsForLayers(plop, includedLayers) {
     registerApplicationPortGenerator(plop);
     registerApplicationUseCaseGenerator(plop);
     registerApplicationFlowGenerator(plop);
+    registerApplicationModuleGenerator(plop);
+    registerApplicationWireModuleGenerator(plop);
     registerApplicationAddDependencyToUseCaseGenerator(plop);
     registerApplicationAddDependencyToFlowGenerator(plop);
   }
@@ -62,11 +60,6 @@ function registerGeneratorsForLayers(plop, includedLayers) {
 
   if (includedLayers.includes("Composition")) {
     registerCompositionPackageGenerator(plop);
-    registerCompositionFeatureDependenciesGenerator(plop);
-    registerCompositionWireUseCaseGenerator(plop);
-    registerCompositionWireFlowGenerator(plop);
-    registerCompositionWireInfrastructureGenerator(plop);
-    registerCompositionWireReactCacheDataloaderGenerator(plop);
   }
 
   if (includedLayers.includes("UI")) {

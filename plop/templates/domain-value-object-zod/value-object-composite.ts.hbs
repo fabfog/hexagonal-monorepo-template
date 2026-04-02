@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { deepEqual, SERIALIZE } from '@domain/core/utils';
+import { deepEqual } from '@domain/core/utils';
 
 export const {{pascalCase valueObjectName}}Schema = z.object({
   // TODO: add fields
@@ -24,7 +24,8 @@ export class {{pascalCase valueObjectName}} {
     return deepEqual(this.props, other.props);
   }
 
-  [SERIALIZE](): Readonly<{{pascalCase valueObjectName}}Props> {
+  /** Snapshot for mappers / APIs (same shape as {@link getProps}). */
+  toSnapshot(): Readonly<{{pascalCase valueObjectName}}Props> {
     return this.getProps();
   }
 }

@@ -9,13 +9,38 @@ import tseslint from "typescript-eslint";
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.join(dirname, "..", "..");
 
-/** Domain file kinds (order: specific paths before catch-all `domain`) */
-const domainLayerTypes = [
+/** Domain slices (order matches `boundaries/elements`: specific before catch-all). */
+const domainElementTypes = [
   "domain-errors",
   "domain-value-objects",
   "domain-entities",
   "domain-services",
-  "domain",
+  "domain-utils",
+  "domain-other",
+];
+
+/** Application orchestration / wiring slices infrastructure must not depend on. */
+const applicationOrchestrationSlices = [
+  "application-use-cases",
+  "application-flows",
+  "application-modules",
+  "application-ports",
+  "application-mappers",
+];
+
+/** Application slices (specific paths before `application-other`). */
+const applicationElementTypes = [
+  "application-dtos",
+  "application-other",
+  ...applicationOrchestrationSlices,
+];
+
+/** Infrastructure package kinds (specific before `infrastructure-other`). */
+const infrastructureElementTypes = [
+  "infrastructure-driven-repository",
+  "infrastructure-driven",
+  "infrastructure-lib",
+  "infrastructure-other",
 ];
 
 /** @type {import('eslint').Linter.Config[]} */
@@ -62,7 +87,11 @@ const config = defineConfig(
           pattern: "packages/domain/**/src/services/**",
         },
         {
-          type: "domain",
+          type: "domain-utils",
+          pattern: "packages/domain/**/src/utils/**",
+        },
+        {
+          type: "domain-other",
           pattern: "packages/domain/**",
         },
         {
@@ -78,7 +107,19 @@ const config = defineConfig(
           pattern: "packages/application/**/src/flows/**",
         },
         {
-          type: "application",
+          type: "application-modules",
+          pattern: "packages/application/**/src/modules/**",
+        },
+        {
+          type: "application-ports",
+          pattern: "packages/application/**/src/ports/**",
+        },
+        {
+          type: "application-mappers",
+          pattern: "packages/application/**/src/mappers/**",
+        },
+        {
+          type: "application-other",
           pattern: "packages/application/**",
         },
         {
@@ -94,7 +135,7 @@ const config = defineConfig(
           pattern: "packages/infrastructure/lib-**",
         },
         {
-          type: "infrastructure",
+          type: "infrastructure-other",
           pattern: "packages/infrastructure/**",
         },
         {
@@ -122,17 +163,29 @@ const config = defineConfig(
         "warn",
         { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
       ],
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["packages/*", "packages/*/*", "packages/*/*/*"],
+              message:
+                "Do not import from filesystem paths under `packages/...`. Use workspace package aliases/exports (e.g. `@application/*`, `@domain/*`, `@composition/*`).",
+            },
+          ],
+        },
+      ],
       "boundaries/dependencies": [
         "error",
         {
           default: "allow",
           rules: [
-            ...domainLayerTypes.map((type) => ({
+            ...domainElementTypes.map((type) => ({
               from: { type },
               disallow: {
                 to: [
-                  { type: "application" },
-                  { type: "infrastructure" },
+                  ...applicationElementTypes.map((t) => ({ type: t })),
+                  ...infrastructureElementTypes.map((t) => ({ type: t })),
                   { type: "apps" },
                   { type: "composition" },
                   { type: "ui" },
@@ -143,8 +196,7 @@ const config = defineConfig(
               from: { type: "infrastructure-driven-repository" },
               disallow: {
                 to: [
-                  { type: "application-use-cases" },
-                  { type: "application-flows" },
+                  ...applicationOrchestrationSlices.map((t) => ({ type: t })),
                   { type: "infrastructure-driven" },
                   { type: "infrastructure-driven-repository" },
                   { type: "apps" },
@@ -152,7 +204,8 @@ const config = defineConfig(
                   { type: "ui" },
                   // Repository adapters may import domain entities; not domain services / stray domain files
                   { type: "domain-services" },
-                  { type: "domain" },
+                  { type: "domain-utils" },
+                  { type: "domain-other" },
                 ],
               },
             },
@@ -160,8 +213,7 @@ const config = defineConfig(
               from: { type: "infrastructure-driven" },
               disallow: {
                 to: [
-                  { type: "application-use-cases" },
-                  { type: "application-flows" },
+                  ...applicationOrchestrationSlices.map((t) => ({ type: t })),
                   { type: "infrastructure-driven" },
                   { type: "infrastructure-driven-repository" },
                   { type: "apps" },
@@ -170,7 +222,8 @@ const config = defineConfig(
                   // Non-repository driven: domain only via errors + value-objects
                   { type: "domain-entities" },
                   { type: "domain-services" },
-                  { type: "domain" },
+                  { type: "domain-utils" },
+                  { type: "domain-other" },
                 ],
               },
             },
@@ -178,8 +231,20 @@ const config = defineConfig(
               from: { type: "infrastructure-lib" },
               disallow: {
                 to: [
-                  { type: "application-use-cases" },
-                  { type: "application-flows" },
+                  ...applicationOrchestrationSlices.map((t) => ({ type: t })),
+                  { type: "infrastructure-driven" },
+                  { type: "infrastructure-driven-repository" },
+                  { type: "apps" },
+                  { type: "composition" },
+                  { type: "ui" },
+                ],
+              },
+            },
+            {
+              from: { type: "infrastructure-other" },
+              disallow: {
+                to: [
+                  ...applicationOrchestrationSlices.map((t) => ({ type: t })),
                   { type: "infrastructure-driven" },
                   { type: "infrastructure-driven-repository" },
                   { type: "apps" },
@@ -198,10 +263,9 @@ const config = defineConfig(
               from: { type: "apps" },
               disallow: {
                 to: [
-                  ...domainLayerTypes.map((type) => ({ type })),
-                  { type: "application-use-cases" },
-                  { type: "application-flows" },
-                  { type: "infrastructure" },
+                  ...domainElementTypes.map((type) => ({ type })),
+                  ...applicationOrchestrationSlices.map((type) => ({ type })),
+                  ...infrastructureElementTypes.map((type) => ({ type })),
                 ],
               },
             },
@@ -209,13 +273,39 @@ const config = defineConfig(
               from: { type: "ui" },
               disallow: {
                 to: [
-                  ...domainLayerTypes.map((type) => ({ type })),
-                  { type: "application" },
-                  { type: "infrastructure" },
+                  ...domainElementTypes.map((type) => ({ type })),
+                  ...applicationOrchestrationSlices.map((type) => ({ type })),
+                  { type: "application-other" },
+                  ...infrastructureElementTypes.map((type) => ({ type })),
                   { type: "apps" },
                   { type: "composition" },
                 ],
               },
+            },
+            // Only composition may depend on `src/modules` (public `@application/*/modules` entry).
+            {
+              from: { type: "application-dtos" },
+              disallow: { to: [{ type: "application-modules" }] },
+            },
+            {
+              from: { type: "application-use-cases" },
+              disallow: { to: [{ type: "application-modules" }] },
+            },
+            {
+              from: { type: "application-flows" },
+              disallow: { to: [{ type: "application-modules" }] },
+            },
+            {
+              from: { type: "application-ports" },
+              disallow: { to: [{ type: "application-modules" }] },
+            },
+            {
+              from: { type: "application-mappers" },
+              disallow: { to: [{ type: "application-modules" }] },
+            },
+            {
+              from: { type: "application-other" },
+              disallow: { to: [{ type: "application-modules" }] },
             },
           ],
         },

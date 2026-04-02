@@ -1,0 +1,14 @@
+export interface {{pascalCase moduleName}}Infra {
+  // Define infrastructure port dependencies that this module's use-cases and flows need to receive
+  // from the composition root (semantic adapters implementing application ports).
+}
+
+export class {{pascalCase moduleName}}Module {
+  // Declare use-cases and flows as public readonly fields, e.g.:
+  // public readonly updateTitle: UpdatePageTitleUseCase;
+
+  constructor(infra: {{pascalCase moduleName}}Infra) {
+    // Wire concrete use-case / flow instances here using the infrastructure slice passed by composition.
+    // this.updateTitle = new UpdatePageTitleUseCase(infra.pageCache, infra.db);
+  }
+}

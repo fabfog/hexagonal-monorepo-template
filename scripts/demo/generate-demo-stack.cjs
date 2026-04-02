@@ -6,31 +6,44 @@
  * Usage: node scripts/demo/generate-demo-stack.cjs
  * Env:   PLOP_LAYER=All (set automatically) so the plopfile registers every generator.
  *
- * v1 is intentionally minimal: support-style Ticket + repository adapter + composition
- * (isomorphic / server / client) + DataLoader wiring. No secondary Port + driven-port-adapter
- * yet (empty "other" ports break that generator until the port defines methods).
+ * v1 is intentionally minimal: support-style Ticket + repository adapter + one composition
+ * package (`src/index.ts`). No secondary Port + driven-port-adapter yet (empty "other" ports
+ * break that generator until the port defines methods).
  *
  * After the Ticket entity, the demo also scaffolds one example VO per kind (single-value:
  * string / boolean / number / Date, plus one composite VO) under @domain/demo-support.
+ *
+ * After `@application/demo-support` exists, `application-entity-to-dto-mapper` adds Ticket DTO +
+ * `mapTicketToDTO` (+ test) under `src/dtos` and `src/mappers`.
+ *
+ * Also adds an example flow (`EscalateTicket` + interaction port), then an application module under
+ * `src/modules/`: `application-module` wires `GetTicketById` + that flow, then `application-wire-module`
+ * adds `UpdateTicket`.
+ * Wiring that module into `@composition/<name>` `get*Modules(ctx)` is left manual (or to your app).
  */
 
 const fs = require("fs");
 const path = require("path");
+const { spawnSync } = require("child_process");
+const { toKebabCase } = require(path.join(__dirname, "..", "..", "plop", "lib", "casing.cjs"));
 
 const {
   DEMO_APPLICATION,
   DEMO_COMPOSITION,
   DEMO_DOMAIN,
+  DEMO_ENTITY,
   DEMO_DRIVEN_REPO,
-  DEMO_FEATURE,
-  DEMO_FEATURE_DIR,
+  DEMO_MODULE_NAME,
   GET_USE_CASE_NAME,
   UPDATE_USE_CASE_NAME,
+  DEMO_FLOW_NAME,
   getDemoMarkerPath,
   repoRootFromScriptsDemo,
 } = require("./demo-stack-config.cjs");
 
 const REPO_ROOT = repoRootFromScriptsDemo();
+/** `support-inbox.module.ts` when `DEMO_MODULE_NAME` is `SupportInbox`. */
+const DEMO_MODULE_FILE = `${toKebabCase(DEMO_MODULE_NAME)}.module.ts`;
 const MARKER = getDemoMarkerPath(REPO_ROOT);
 
 function assertCleanOrForce() {
@@ -45,7 +58,12 @@ function assertCleanOrForce() {
 }
 
 /**
- * @typedef {{ name: string, answers: Record<string, unknown>, note?: string }} DemoStep
+ * @typedef {{
+ *   name: string,
+ *   answers?: Record<string, unknown>,
+ *   note?: string,
+ *   run?: () => void,
+ * }} DemoStep
  */
 
 /** Ordered "as if" user answered Plop — read top-to-bottom as the demo checklist. */
@@ -114,9 +132,35 @@ const STEPS = /** @type {DemoStep[]} */ ([
     },
   },
   {
+    name: "__pnpm_install__",
+    note: "pnpm install (so TypeScript can resolve zod + @domain/* for DTO/mapper codegen)",
+    run: () => {
+      const result = spawnSync("pnpm", ["install"], {
+        cwd: REPO_ROOT,
+        stdio: "inherit",
+        shell: process.platform === "win32",
+      });
+      if (result.error) {
+        console.error("[demo] pnpm install failed:", result.error);
+        process.exit(1);
+      }
+      if (result.status !== 0) {
+        process.exit(result.status ?? 1);
+      }
+    },
+  },
+  {
     name: "application-package",
     note: "Application layer for ports / use cases",
     answers: { packageName: DEMO_APPLICATION },
+  },
+  {
+    name: "application-entity-to-dto-mapper",
+    note: `${DEMO_ENTITY}DTO + map${DEMO_ENTITY}ToDTO + mapper test`,
+    answers: {
+      packageName: DEMO_DOMAIN,
+      entityName: DEMO_ENTITY,
+    },
   },
   {
     name: "application-port",
@@ -168,6 +212,34 @@ const STEPS = /** @type {DemoStep[]} */ ([
     },
   },
   {
+    name: "application-flow",
+    note: "Example flow + interaction port (orchestration stub)",
+    answers: {
+      packageName: DEMO_APPLICATION,
+      flowName: DEMO_FLOW_NAME,
+    },
+  },
+  {
+    name: "application-module",
+    note: `${DEMO_MODULE_NAME}Module + Infra: GetTicketById + ${DEMO_FLOW_NAME}Flow (./modules export)`,
+    answers: {
+      packageName: DEMO_APPLICATION,
+      moduleName: DEMO_MODULE_NAME,
+      useCaseBases: [GET_USE_CASE_NAME],
+      flowBases: [DEMO_FLOW_NAME],
+    },
+  },
+  {
+    name: "application-wire-module",
+    note: `Progressive wiring: add UpdateTicketUseCase to ${DEMO_MODULE_NAME}Module`,
+    answers: {
+      packageName: DEMO_APPLICATION,
+      moduleFileName: DEMO_MODULE_FILE,
+      useCaseBases: [UPDATE_USE_CASE_NAME],
+      flowBases: [],
+    },
+  },
+  {
     name: "infrastructure-driven-adapter-package",
     note: "Persistence-side package (repository adapter target)",
     answers: { name: "demo-support", isRepository: true },
@@ -184,55 +256,8 @@ const STEPS = /** @type {DemoStep[]} */ ([
   },
   {
     name: "composition-package",
-    note: "Composition root",
+    note: "Composition root (src/index.ts + exports)",
     answers: { name: DEMO_COMPOSITION },
-  },
-  {
-    name: "composition-feature-dependencies",
-    note: "Feature factory registered on needed runtimes",
-    answers: {
-      packageName: DEMO_COMPOSITION,
-      featureName: DEMO_FEATURE,
-      runtimes: ["server", "client"],
-    },
-  },
-  {
-    name: "composition-wire-use-case",
-    note: `Expose ${GET_USE_CASE_NAME} on server`,
-    answers: {
-      compositionPackage: DEMO_COMPOSITION,
-      featureName: DEMO_FEATURE_DIR,
-      runtimes: ["server"],
-      applicationPackage: DEMO_APPLICATION,
-      useCaseName: GET_USE_CASE_NAME,
-    },
-  },
-  {
-    name: "composition-wire-use-case",
-    note: `Expose ${UPDATE_USE_CASE_NAME} on client bundle`,
-    answers: {
-      compositionPackage: DEMO_COMPOSITION,
-      featureName: DEMO_FEATURE_DIR,
-      runtimes: ["client"],
-      applicationPackage: DEMO_APPLICATION,
-      useCaseName: UPDATE_USE_CASE_NAME,
-    },
-  },
-  {
-    name: "composition-wire-react-cache-dataloader",
-    note: "Per-request DataLoader registry on server",
-    answers: { compositionPackage: DEMO_COMPOSITION },
-  },
-  {
-    name: "composition-wire-infrastructure",
-    note: "Lazy TicketRepository on server infrastructure",
-    answers: {
-      compositionPackage: DEMO_COMPOSITION,
-      runtimes: ["server"],
-      drivenPackage: DEMO_DRIVEN_REPO,
-      infrastructureKey: "ticketRepository",
-      adapterClassName: "TicketRepository",
-    },
   },
 ]);
 
@@ -255,6 +280,12 @@ async function main() {
     const label = step.note ? `${step.name} — ${step.note}` : step.name;
     console.log(`\n[demo] ${index}/${STEPS.length} ${label}`);
 
+    if (typeof step.run === "function") {
+      step.run();
+      console.log(`[demo] OK`);
+      continue;
+    }
+
     const generator = plop.getGenerator(step.name);
     const { failures, changes } = await generator.runActions({ ...step.answers });
 
@@ -269,7 +300,7 @@ async function main() {
   }
 
   console.log(
-    "\n[demo] Done. Next: pnpm install, then wire use cases to real deps / add apps/demo-next in a follow-up."
+    "\n[demo] Done. Next: wire composition (infrastructure, modules / dependencies, use-cases) by hand or add apps in a follow-up."
   );
 }
 

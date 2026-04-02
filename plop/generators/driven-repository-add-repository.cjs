@@ -11,7 +11,7 @@ const {
   parseRepositoryPortMetadata,
   parseRepositoryPortInterfaceName,
   getDrivenRepositoryInfrastructurePackageChoices,
-} = require("../lib/index.cjs");
+} = require("../lib");
 const {
   getEntityNotFoundErrorSpec,
   appendEnsureEntityNotFoundErrorActions,

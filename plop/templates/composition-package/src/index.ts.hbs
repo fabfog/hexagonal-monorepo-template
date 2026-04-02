@@ -1,0 +1,23 @@
+import type { RequestContext } from "./types";
+import { infrastructureProvider } from "./infrastructure";
+
+/**
+ * Request-scoped application modules: Module classes from each `@application` package (its
+ * `modules` entry) that wire use-cases
+ * or flows in their constructor. Call this per request (or job) with the same `ctx` you pass
+ * through your stack.
+ *
+ * Example:
+ *   import { AuthModule } from "@application/auth/module";
+ *
+ *   export function get{{pascalCase name}}Modules(ctx: RequestContext) {
+ *     const infra = infrastructureProvider.getForContext(ctx);
+ *     return {
+ *       auth: new AuthModule(infra),
+ *     };
+ *   }
+ */
+export function get{{pascalCase name}}Modules(ctx: RequestContext) {
+  const infrastructure = infrastructureProvider.getForContext(ctx);
+  return {};
+}

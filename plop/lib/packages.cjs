@@ -48,6 +48,27 @@ function getApplicationPackageChoices(repoRoot) {
 }
 
 /**
+ * Existing `*.module.ts` files under `src/modules/` (for progressive wiring).
+ * @param {string} repoRoot
+ * @param {string} applicationPackage
+ * @returns {{ name: string, value: string }[]}
+ */
+function getApplicationModuleFileChoices(repoRoot, applicationPackage) {
+  const modulesDir = packagePath(repoRoot, "application", applicationPackage, "src", "modules");
+  if (!fs.existsSync(modulesDir)) {
+    return [];
+  }
+  return fs
+    .readdirSync(modulesDir, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && entry.name.endsWith(".module.ts"))
+    .map((entry) => ({
+      name: entry.name,
+      value: entry.name,
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/**
  * @param {string} repoRoot
  * @param {{ excludeCore?: boolean }} [options] excludeCore defaults to true
  */
@@ -279,6 +300,31 @@ function getDomainEntityChoices(repoRoot, domainPackage) {
  * @param {string} repoRoot
  * @param {string} applicationPackage
  */
+/**
+ * Checkbox choices for wiring modules; empty if folder missing or no files.
+ * @param {string} repoRoot
+ * @param {string} applicationPackage
+ * @returns {{ name: string, value: string }[]}
+ */
+function getApplicationFlowCheckboxChoices(repoRoot, applicationPackage) {
+  const flowsDir = packagePath(repoRoot, "application", applicationPackage, "src", "flows");
+  if (!fs.existsSync(flowsDir)) {
+    return [];
+  }
+  return fs
+    .readdirSync(flowsDir, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && entry.name.endsWith(".flow.ts"))
+    .map((entry) => {
+      const base = entry.name.replace(/\.flow\.ts$/, "");
+      const pascal = toPascalCase(base);
+      return {
+        name: `${pascal}Flow (${entry.name})`,
+        value: pascal,
+      };
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
 function getApplicationFlowChoices(repoRoot, applicationPackage) {
   const flowsDir = packagePath(repoRoot, "application", applicationPackage, "src", "flows");
   if (!fs.existsSync(flowsDir)) {
@@ -305,6 +351,31 @@ function getApplicationFlowChoices(repoRoot, applicationPackage) {
  * @param {string} repoRoot
  * @param {string} applicationPackage
  */
+/**
+ * Checkbox choices for wiring modules; empty if folder missing or no files.
+ * @param {string} repoRoot
+ * @param {string} applicationPackage
+ * @returns {{ name: string, value: string }[]}
+ */
+function getApplicationUseCaseCheckboxChoices(repoRoot, applicationPackage) {
+  const useCasesDir = packagePath(repoRoot, "application", applicationPackage, "src", "use-cases");
+  if (!fs.existsSync(useCasesDir)) {
+    return [];
+  }
+  return fs
+    .readdirSync(useCasesDir, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && entry.name.endsWith(".use-case.ts"))
+    .map((entry) => {
+      const base = entry.name.replace(/\.use-case\.ts$/, "");
+      const pascal = toPascalCase(base);
+      return {
+        name: `${pascal}UseCase (${entry.name})`,
+        value: pascal,
+      };
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
 function getApplicationUseCaseChoices(repoRoot, applicationPackage) {
   const useCasesDir = packagePath(repoRoot, "application", applicationPackage, "src", "use-cases");
   if (!fs.existsSync(useCasesDir)) {
@@ -327,97 +398,13 @@ function getApplicationUseCaseChoices(repoRoot, applicationPackage) {
   return useCases;
 }
 
-/** Runtime entry points for composition packages */
-const COMPOSITION_RUNTIMES = /** @type {const} */ (["isomorphic", "server", "client"]);
-
 /**
- * Path to feature dependencies.ts for a given runtime.
- * All runtimes under src/<runtime>/<feature>/dependencies.ts
- * @param {string} repoRoot
- * @param {string} compositionPackage
- * @param {string} featureName
- * @param {keyof typeof COMPOSITION_RUNTIMES} runtime
- */
-function getFeatureDependenciesPath(repoRoot, compositionPackage, featureName, runtime) {
-  const base = packagePath(repoRoot, "composition", compositionPackage, "src", runtime);
-  return path.join(base, featureName, "dependencies.ts");
-}
-
-/**
- * Runtimes where a feature exists (has dependencies.ts).
- * @param {string} repoRoot
- * @param {string} compositionPackage
- * @param {string} featureName
- * @returns {Array<keyof typeof COMPOSITION_RUNTIMES>}
- */
-function getRuntimesForFeature(repoRoot, compositionPackage, featureName) {
-  return COMPOSITION_RUNTIMES.filter((r) => {
-    const p = getFeatureDependenciesPath(repoRoot, compositionPackage, featureName, r);
-    return fs.existsSync(p);
-  });
-}
-
-/**
- * Path to infrastructure.ts for a given runtime.
- * @param {string} repoRoot
- * @param {string} compositionPackage
- * @param {keyof typeof COMPOSITION_RUNTIMES} runtime
- */
-function getInfrastructurePath(repoRoot, compositionPackage, runtime) {
-  const base = packagePath(repoRoot, "composition", compositionPackage, "src", runtime);
-  return path.join(base, "infrastructure.ts");
-}
-
-/**
- * Path to entry index.ts for a given runtime.
- * @param {string} repoRoot
- * @param {string} compositionPackage
- * @param {keyof typeof COMPOSITION_RUNTIMES} runtime
- */
-function getEntryIndexPath(repoRoot, compositionPackage, runtime) {
-  const base = packagePath(repoRoot, "composition", compositionPackage, "src", runtime);
-  return path.join(base, "index.ts");
-}
-
-/**
- * Subfolders of composition package src that contain dependencies.ts.
- * Scans src/isomorphic, src/server, src/client for <feature>/dependencies.ts.
- * Returns unique feature names.
+ * Single composition entry: `src/index.ts` (one package = one wiring surface; use multiple packages for multiple surfaces).
  * @param {string} repoRoot
  * @param {string} compositionPackage
  */
-function getCompositionFeatureChoices(repoRoot, compositionPackage) {
-  const srcDir = packagePath(repoRoot, "composition", compositionPackage, "src");
-  if (!fs.existsSync(srcDir)) {
-    throw new Error(`Composition package "${compositionPackage}" has no src folder.`);
-  }
-  const seen = new Set();
-  const features = [];
-
-  function scanDir(dir) {
-    if (!fs.existsSync(dir)) return;
-    const entries = fs.readdirSync(dir, { withFileTypes: true });
-    for (const entry of entries) {
-      if (entry.isDirectory()) {
-        const depsPath = path.join(dir, entry.name, "dependencies.ts");
-        if (fs.existsSync(depsPath) && !seen.has(entry.name)) {
-          seen.add(entry.name);
-          features.push({ name: entry.name, value: entry.name });
-        }
-      }
-    }
-  }
-
-  for (const runtime of COMPOSITION_RUNTIMES) {
-    scanDir(path.join(srcDir, runtime));
-  }
-
-  if (!features.length) {
-    throw new Error(
-      `Composition package "${compositionPackage}" has no features with dependencies.ts. Create one first with "composition-feature-dependencies".`
-    );
-  }
-  return features;
+function getCompositionEntryIndexPath(repoRoot, compositionPackage) {
+  return path.join(packagePath(repoRoot, "composition", compositionPackage, "src"), "index.ts");
 }
 
 /** @param {string} filePath */
@@ -457,31 +444,53 @@ function ensureZodDependencyInDomainPackage(repoRoot, domainPackageName) {
   return "zod already present in domain package dependencies";
 }
 
-const COMPOSITION_RUNTIME_INFRASTRUCTURE_TS = "export const infrastructure = {};\n";
-
-const COMPOSITION_RUNTIME_INDEX_TS = `import { infrastructure } from "./infrastructure";
-
-export { infrastructure };
-export const dependencies = {
-};
-`;
+/**
+ * Render a composition-package `src/*.hbs` template (`{{pascalCase name}}` → PascalCase of folder).
+ * @param {string} compositionFolderName kebab package folder (e.g. demo-web)
+ * @param {string} srcFileName template file under templates/composition-package/src/ (e.g. index.ts.hbs)
+ */
+function renderCompositionPackageSrcTemplate(compositionFolderName, srcFileName) {
+  const templatePath = path.join(
+    __dirname,
+    "..",
+    "templates",
+    "composition-package",
+    "src",
+    srcFileName
+  );
+  const raw = readUtf8File(templatePath);
+  const pascal = toPascalCase(compositionFolderName);
+  return raw.replace(/\{\{\s*pascalCase name\s*\}\}/g, pascal);
+}
 
 /**
- * Create src/<runtime>/ (infrastructure.ts + index.ts) if missing.
+ * Default `src/index.ts` for a composition package (same as rendered `index.ts.hbs`).
+ * @param {string} compositionFolderName kebab package folder (e.g. demo-web)
+ */
+function getDefaultCompositionEntryTs(compositionFolderName) {
+  return renderCompositionPackageSrcTemplate(compositionFolderName, "index.ts.hbs");
+}
+
+/**
+ * Create `src/types.ts`, `src/infrastructure.ts`, and `src/index.ts` if `index.ts` is missing.
  * @param {string} repoRoot
  * @param {string} compositionPackage
- * @param {typeof COMPOSITION_RUNTIMES[number]} runtime
  */
-function ensureCompositionRuntimeFiles(repoRoot, compositionPackage, runtime) {
-  const runtimeDir = packagePath(repoRoot, "composition", compositionPackage, "src", runtime);
-  fs.mkdirSync(runtimeDir, { recursive: true });
-  const infraPath = path.join(runtimeDir, "infrastructure.ts");
-  const indexPath = path.join(runtimeDir, "index.ts");
-  if (!fs.existsSync(infraPath)) {
-    fs.writeFileSync(infraPath, COMPOSITION_RUNTIME_INFRASTRUCTURE_TS, "utf8");
-  }
+function ensureCompositionEntryFile(repoRoot, compositionPackage) {
+  const srcDir = packagePath(repoRoot, "composition", compositionPackage, "src");
+  fs.mkdirSync(srcDir, { recursive: true });
+  const indexPath = path.join(srcDir, "index.ts");
   if (!fs.existsSync(indexPath)) {
-    fs.writeFileSync(indexPath, COMPOSITION_RUNTIME_INDEX_TS, "utf8");
+    const files = ["types.ts.hbs", "infrastructure.ts.hbs", "index.ts.hbs"];
+    for (const hbs of files) {
+      const outName = hbs.replace(/\.hbs$/, "");
+      const outPath = path.join(srcDir, outName);
+      fs.writeFileSync(
+        outPath,
+        renderCompositionPackageSrcTemplate(compositionPackage, hbs),
+        "utf8"
+      );
+    }
   }
 }
 
@@ -503,21 +512,16 @@ function sortCompositionExportEntries(exportsObj) {
 }
 
 /**
- * Add package.json exports for the given runtimes (idempotent). Mutates `pkg`.
+ * Ensure package.json has a root export to `src/index.ts` (idempotent). Mutates `pkg`.
  * @param {Record<string, unknown>} pkg
- * @param {readonly (typeof COMPOSITION_RUNTIMES[number])[]} runtimes
  */
-function mergeCompositionPackageExports(pkg, runtimes) {
+function ensureCompositionPackageRootExport(pkg) {
   const prev =
     pkg.exports && typeof pkg.exports === "object" && !Array.isArray(pkg.exports)
       ? /** @type {Record<string, string>} */ ({ ...pkg.exports })
       : /** @type {Record<string, string>} */ ({});
-  for (const runtime of runtimes) {
-    const key = runtime === "isomorphic" ? "." : `./${runtime}`;
-    const val = `./src/${runtime}/index.ts`;
-    if (prev[key] == null) {
-      prev[key] = val;
-    }
+  if (prev["."] == null) {
+    prev["."] = "./src/index.ts";
   }
   pkg.exports = sortCompositionExportEntries(prev);
 }
@@ -525,14 +529,13 @@ function mergeCompositionPackageExports(pkg, runtimes) {
 /**
  * @param {string} repoRoot
  * @param {string} compositionPackage
- * @param {typeof COMPOSITION_RUNTIMES[number]} runtime
  */
-function assertCompositionRuntimeIndexExists(repoRoot, compositionPackage, runtime) {
-  const p = getEntryIndexPath(repoRoot, compositionPackage, runtime);
+function assertCompositionEntryIndexExists(repoRoot, compositionPackage) {
+  const p = getCompositionEntryIndexPath(repoRoot, compositionPackage);
   if (!fs.existsSync(p)) {
     throw new Error(
-      `Missing ${runtime} entry for @composition/${compositionPackage} (expected ${path.relative(repoRoot, p)}). ` +
-        `Add a feature that includes the "${runtime}" runtime (composition-feature-dependencies), or create that file manually.`
+      `Missing composition entry for @composition/${compositionPackage} (expected ${path.relative(repoRoot, p)}). ` +
+        `Run composition-package or create src/index.ts manually.`
     );
   }
 }
@@ -544,6 +547,7 @@ module.exports = {
   listChildDirectoryNames,
   toPlopChoices,
   getApplicationPackageChoices,
+  getApplicationModuleFileChoices,
   getDomainPackageChoices,
   getDomainPackageNamesOrThrow,
   getCompositionPackageChoices,
@@ -559,18 +563,16 @@ module.exports = {
   getInteractionPortChoices,
   readApplicationPortSource,
   getDomainEntityChoices,
+  getApplicationFlowCheckboxChoices,
   getApplicationFlowChoices,
+  getApplicationUseCaseCheckboxChoices,
   getApplicationUseCaseChoices,
-  getCompositionFeatureChoices,
   readPackageJson,
   writePackageJson,
   ensureZodDependencyInDomainPackage,
-  COMPOSITION_RUNTIMES,
-  getFeatureDependenciesPath,
-  getInfrastructurePath,
-  getEntryIndexPath,
-  getRuntimesForFeature,
-  ensureCompositionRuntimeFiles,
-  mergeCompositionPackageExports,
-  assertCompositionRuntimeIndexExists,
+  getCompositionEntryIndexPath,
+  getDefaultCompositionEntryTs,
+  ensureCompositionEntryFile,
+  ensureCompositionPackageRootExport,
+  assertCompositionEntryIndexExists,
 };

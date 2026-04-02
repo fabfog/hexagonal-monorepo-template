@@ -1,4 +1,5 @@
 const fs = require("fs");
+const path = require("path");
 const {
   getRepoRoot,
   toKebabCase,
@@ -6,10 +7,12 @@ const {
   getApplicationPackageChoices,
   getDomainEntityChoices,
   packageJsonPath,
+  packagePath,
   toPlopChoices,
 } = require("../lib");
 const { getApplicationPackageBaseActions } = require("./application-package.cjs");
 const { ensureApplicationPackageSlice } = require("../lib/ensure-package-slice.cjs");
+const { generateApplicationEntityMapperSources } = require("../lib/entity-to-dto-map-codegen.cjs");
 
 const repoRoot = getRepoRoot();
 
@@ -121,25 +124,41 @@ module.exports = function registerApplicationEntityToDtoMapperGenerator(plop) {
         ensureApplicationPackageSlice(repoRoot, applicationPackage, "mappers");
       });
 
-      // DTO file
-      actions.push({
-        type: "add",
-        path: `../packages/application/${applicationPackage}/src/dtos/${entityKebab}.dto.ts`,
-        templateFile: "templates/application-entity-to-dto-mapper/dto.ts.hbs",
-      });
+      actions.push(() => {
+        const { dtoSource, mapperSource, testSource } = generateApplicationEntityMapperSources({
+          repoRoot,
+          domainPackage: domainPackageName,
+          entityBasePascal: entityName,
+          applicationPackage,
+        });
 
-      // Mapper file
-      actions.push({
-        type: "add",
-        path: `../packages/application/${applicationPackage}/src/mappers/${entityKebab}.mapper.ts`,
-        templateFile: "templates/application-entity-to-dto-mapper/mapper.ts.hbs",
-      });
+        const dtosDir = packagePath(repoRoot, "application", applicationPackage, "src", "dtos");
+        const mappersDir = packagePath(
+          repoRoot,
+          "application",
+          applicationPackage,
+          "src",
+          "mappers"
+        );
+        const dtoFile = path.join(dtosDir, `${entityKebab}.dto.ts`);
+        const mapperFile = path.join(mappersDir, `${entityKebab}.mapper.ts`);
+        const testFile = path.join(mappersDir, `${entityKebab}.mapper.test.ts`);
 
-      // Mapper test file
-      actions.push({
-        type: "add",
-        path: `../packages/application/${applicationPackage}/src/mappers/${entityKebab}.mapper.test.ts`,
-        templateFile: "templates/application-entity-to-dto-mapper/mapper.test.ts.hbs",
+        for (const [filePath, label] of [
+          [dtoFile, "DTO"],
+          [mapperFile, "Mapper"],
+          [testFile, "Mapper test"],
+        ]) {
+          if (fs.existsSync(filePath)) {
+            throw new Error(
+              `${label} already exists: ${path.relative(repoRoot, filePath)}. Remove it or choose another entity.`
+            );
+          }
+        }
+
+        fs.writeFileSync(dtoFile, dtoSource);
+        fs.writeFileSync(mapperFile, mapperSource);
+        fs.writeFileSync(testFile, testSource);
       });
 
       // Update dtos barrel

@@ -8,7 +8,7 @@ const INITIAL_BARREL = "export {};\n";
 const DOMAIN_SLICES = ["entities", "value-objects", "errors", "services"];
 
 /** @type {readonly string[]} */
-const APPLICATION_SLICES = ["ports", "flows", "use-cases", "dtos", "mappers"];
+const APPLICATION_SLICES = ["ports", "flows", "use-cases", "dtos", "mappers", "modules"];
 
 /**
  * @param {readonly string[]} allowed

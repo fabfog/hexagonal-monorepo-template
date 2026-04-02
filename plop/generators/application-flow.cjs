@@ -20,13 +20,14 @@ module.exports = function registerApplicationFlowGenerator(plop) {
         message:
           "Flow base name (e.g. UpdateUser, PublishPage). Do not include Flow in the name, it will be added automatically:",
         validate: (value) => String(value || "").trim().length > 0 || "Name cannot be empty",
+        filter: (value) => String(value || "").trim(),
       },
     ],
     actions: (data) => {
-      const { packageName, flowName } = data;
+      const { packageName } = data;
+      const flowName = String(data.flowName || "").trim();
       const flowKebab = toKebabCase(flowName);
       const interactionName = `${flowName}InteractionPort`;
-      const interactionKebab = toKebabCase(interactionName);
 
       /** @type {import('plop').ActionType[]} */
       const actions = [];
@@ -53,7 +54,7 @@ module.exports = function registerApplicationFlowGenerator(plop) {
         path: "../packages/application/{{packageName}}/src/ports/index.ts",
         transform: (file) => {
           const cleaned = file.replace(/^export\s*{\s*}\s*;?\s*$/m, "").trimEnd();
-          const exportLine = `export * from './${interactionKebab}.port';`;
+          const exportLine = `export * from './${flowKebab}.interaction.port';`;
 
           if (cleaned.includes(exportLine)) {
             return `${cleaned}\n`;
