@@ -11,10 +11,11 @@
     "test:watch": "vitest --watch",
     "test:coverage": "vitest run --coverage",
     "prepare": "husky install",
-    "demo:generate": "node scripts/demo/generate-demo-stack.cjs",
-    "demo:remove": "node scripts/demo/remove-demo-stack.cjs",
     "deps:renovate": "npx -p renovate renovate-config-validator renovate.json",
-    "deps:lint": "depcruise --config .dependency-cruiser.cjs packages -T err"
+    "deps:lint": "depcruise --config .dependency-cruiser.cjs packages -T err",
+    "deps:graph": "node scripts/deps-graph-html-open.cjs",
+    "demo:generate": "node scripts/demo/generate-demo-stack.cjs",
+    "demo:remove": "node scripts/demo/remove-demo-stack.cjs"
   },
   "devDependencies": {
     "@repo/config-eslint": "workspace:^",

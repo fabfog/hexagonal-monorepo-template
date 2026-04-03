@@ -13,8 +13,12 @@ module.exports = {
   options: {
     // We only validate dependencies between domain/application packages.
     includeOnly: "^packages/",
+    // Match `node_modules` anywhere (pnpm nests under packages/*/node_modules; `^node_modules` misses that and can crawl forever).
     exclude: {
-      path: "^node_modules",
+      path: "node_modules|\\.pnpm/",
+    },
+    doNotFollow: {
+      path: "node_modules|\\.pnpm/",
     },
     // Use repo TS config to help resolution of TS sources/paths.
     tsConfig: {

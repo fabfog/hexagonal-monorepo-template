@@ -32,6 +32,8 @@ Optional: validate config locally with `npx -p renovate renovate-config-validato
 - `pnpm lint:fix` – ESLint with auto-fix where possible
 - `pnpm format` – Format the whole codebase with Prettier
 - `pnpm format:check` – Check formatting without modifying files
+- `pnpm deps:lint` – Enforce dependency rules with dependency-cruiser (see `.dependency-cruiser.cjs`)
+- `pnpm deps:graph` – Open an HTML **package-level** graph (Mermaid, colors by layer under `packages/`). Output is written to `.dependency-cruiser-report/` (gitignored). With Graphviz `dot` on `PATH`, a `packages.svg` is also generated from `packages.dot`.
 
 ---
 
