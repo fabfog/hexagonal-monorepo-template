@@ -19,22 +19,33 @@ const domainElementTypes = [
   "domain-other",
 ];
 
-/** Application orchestration */
-const applicationOrchestrationSlices = [
+/**
+ * Application slices that are NOT orchestration.
+ * Used in allow rules: every application slice (orchestration or not) may import these,
+ * but orchestration slices are excluded — they can only be composed externally.
+ */
+const applicationNonOrchestrationSlices = [
+  "application-dtos",
+  "application-interaction-ports",
+  "application-ports",
+  "application-mappers",
+  "application-other",
+];
+
+/** All Application slices (specific paths before `application-other`).
+ * NOTE: `application-interaction-ports` must come before `application-ports` so the
+ * more-specific glob wins first-match in boundaries/elements. */
+const applicationElementTypes = [
   "application-use-cases",
   "application-flows",
   "application-modules",
+  ...applicationNonOrchestrationSlices,
 ];
 
-/** Application orchestration + other logics (mapping) */
-const applicationLogicsSlices = [...applicationOrchestrationSlices, "application-mappers"];
-
-/** All Application slices (specific paths before `application-other`). */
-const applicationElementTypes = [
-  ...applicationLogicsSlices,
-  "application-dtos",
-  "application-ports",
-  "application-other",
+/** What any application slice may import: full domain + non-orchestration application only. */
+const applicationAllowTo = [
+  ...domainElementTypes.map((t) => ({ type: t })),
+  ...applicationNonOrchestrationSlices.map((t) => ({ type: t })),
 ];
 
 /** Infrastructure package kinds (specific before `infrastructure-other`). */
@@ -113,6 +124,10 @@ const config = defineConfig(
           pattern: "packages/application/**/src/modules/**",
         },
         {
+          type: "application-interaction-ports",
+          pattern: "packages/application/**/src/ports/*.interaction.port.*",
+        },
+        {
           type: "application-ports",
           pattern: "packages/application/**/src/ports/**",
         },
@@ -180,143 +195,130 @@ const config = defineConfig(
       "boundaries/dependencies": [
         "error",
         {
-          default: "allow",
+          default: "disallow",
           rules: [
+            // ── Domain ──────────────────────────────────────────────────────
+            // Domain is self-contained: any domain slice may import any other domain slice.
             ...domainElementTypes.map((type) => ({
               from: { type },
-              disallow: {
+              allow: { to: domainElementTypes.map((t) => ({ type: t })) },
+            })),
+
+            // ── Application: use-cases, flows, and non-orchestration slices ──
+            // May import: all domain types + non-orchestration application types
+            // (dtos, ports, mappers, other).
+            // Use-cases and flows are intentionally absent from this list so they
+            // cannot call each other directly — cross-slice orchestration happens in modules.
+            ...applicationElementTypes
+              .filter((t) => t !== "application-modules")
+              .map((type) => ({
+                from: { type },
+                allow: { to: applicationAllowTo },
+              })),
+
+            // ── Application: modules ─────────────────────────────────────────
+            // Modules wire use-cases and flows together (import their types for DI).
+            // They may NOT import other modules — module composition happens in composition.
+            {
+              from: { type: "application-modules" },
+              allow: {
                 to: [
-                  ...applicationElementTypes.map((t) => ({ type: t })),
-                  ...infrastructureElementTypes.map((t) => ({ type: t })),
-                  { type: "apps" },
-                  { type: "composition" },
-                  { type: "ui" },
+                  ...applicationAllowTo,
+                  { type: "application-use-cases" },
+                  { type: "application-flows" },
+                ],
+              },
+            },
+
+            // ── Infrastructure: driven-repository ────────────────────────────
+            // May touch domain entities (for mapping) + errors/VOs,
+            // application contracts (ports/dtos), and lib/other infra.
+            {
+              from: { type: "infrastructure-driven-repository" },
+              allow: {
+                to: [
+                  { type: "domain-errors" },
+                  { type: "domain-value-objects" },
+                  { type: "domain-entities" },
+                  { type: "application-dtos" },
+                  { type: "application-interaction-ports" },
+                  { type: "application-ports" },
+                  { type: "application-other" },
+                  { type: "infrastructure-lib" },
+                  { type: "infrastructure-other" },
+                ],
+              },
+            },
+
+            // ── Infrastructure: driven (non-repository) ──────────────────────
+            // Narrower domain access than repository: only errors + VOs (no entities).
+            {
+              from: { type: "infrastructure-driven" },
+              allow: {
+                to: [
+                  { type: "domain-errors" },
+                  { type: "domain-value-objects" },
+                  { type: "application-dtos" },
+                  { type: "application-interaction-ports" },
+                  { type: "application-ports" },
+                  { type: "application-other" },
+                  { type: "infrastructure-lib" },
+                  { type: "infrastructure-other" },
+                ],
+              },
+            },
+
+            // ── Infrastructure: lib / other ──────────────────────────────────
+            // Generic infra utilities: full domain access + application contracts + lib/other infra.
+            ...["infrastructure-lib", "infrastructure-other"].map((type) => ({
+              from: { type },
+              allow: {
+                to: [
+                  ...domainElementTypes.map((t) => ({ type: t })),
+                  { type: "application-dtos" },
+                  { type: "application-interaction-ports" },
+                  { type: "application-ports" },
+                  { type: "application-other" },
+                  { type: "infrastructure-lib" },
+                  { type: "infrastructure-other" },
                 ],
               },
             })),
-            {
-              from: { type: "infrastructure-driven-repository" },
-              disallow: {
-                to: [
-                  ...applicationLogicsSlices.map((t) => ({ type: t })),
-                  { type: "infrastructure-driven" },
-                  { type: "infrastructure-driven-repository" },
-                  { type: "apps" },
-                  { type: "composition" },
-                  { type: "ui" },
-                  // Repository adapters may import domain entities; not domain services / stray domain files
-                  { type: "domain-services" },
-                  { type: "domain-utils" },
-                  { type: "domain-other" },
-                ],
-              },
-            },
-            {
-              from: { type: "infrastructure-driven" },
-              disallow: {
-                to: [
-                  ...applicationLogicsSlices.map((t) => ({ type: t })),
-                  { type: "infrastructure-driven" },
-                  { type: "infrastructure-driven-repository" },
-                  { type: "apps" },
-                  { type: "composition" },
-                  { type: "ui" },
-                  // Non-repository driven: domain only via errors + value-objects
-                  { type: "domain-entities" },
-                  { type: "domain-services" },
-                  { type: "domain-utils" },
-                  { type: "domain-other" },
-                ],
-              },
-            },
-            {
-              from: { type: "infrastructure-lib" },
-              disallow: {
-                to: [
-                  ...applicationLogicsSlices.map((t) => ({ type: t })),
-                  { type: "infrastructure-driven" },
-                  { type: "infrastructure-driven-repository" },
-                  { type: "apps" },
-                  { type: "composition" },
-                  { type: "ui" },
-                ],
-              },
-            },
-            {
-              from: { type: "infrastructure-other" },
-              disallow: {
-                to: [
-                  ...applicationLogicsSlices.map((t) => ({ type: t })),
-                  { type: "infrastructure-driven" },
-                  { type: "infrastructure-driven-repository" },
-                  { type: "apps" },
-                  { type: "composition" },
-                  { type: "ui" },
-                ],
-              },
-            },
+
+            // ── Composition ──────────────────────────────────────────────────
+            // The wiring layer: may import from any layer except apps and ui.
             {
               from: { type: "composition" },
-              disallow: {
-                to: [{ type: "apps" }, { type: "ui" }],
+              allow: {
+                to: [
+                  ...domainElementTypes.map((t) => ({ type: t })),
+                  ...applicationElementTypes.map((t) => ({ type: t })),
+                  ...infrastructureElementTypes.map((t) => ({ type: t })),
+                ],
               },
             },
+
+            // ── Apps ─────────────────────────────────────────────────────────
+            // Runnable apps: only composition (wiring) + application DTOs and
+            // interaction ports (InteractionPort types for UI-driven flows) + ui packages.
             {
               from: { type: "apps" },
-              disallow: {
+              allow: {
                 to: [
-                  ...domainElementTypes.map((type) => ({ type })),
-                  ...applicationElementTypes.map((type) => ({ type })),
-                  ...infrastructureElementTypes.map((type) => ({ type })),
+                  { type: "application-dtos" },
+                  { type: "application-interaction-ports" },
+                  { type: "composition" },
+                  { type: "ui" },
                 ],
               },
             },
+
+            // ── UI ───────────────────────────────────────────────────────────
+            // View packages: data flows in through composition props; no direct layer imports.
+            // Only exception: ui may import other ui packages (e.g. ui-icons → ui-react).
             {
               from: { type: "ui" },
-              disallow: {
-                to: [
-                  ...domainElementTypes.map((type) => ({ type })),
-                  ...applicationElementTypes.map((type) => ({ type })),
-                  { type: "application-other" },
-                  ...infrastructureElementTypes.map((type) => ({ type })),
-                  { type: "apps" },
-                  { type: "composition" },
-                ],
-              },
-            },
-            {
-              from: { type: "application-dtos" },
-              disallow: { to: [...applicationOrchestrationSlices.map((type) => ({ type }))] },
-            },
-            {
-              from: { type: "application-use-cases" },
-              disallow: {
-                to: [...applicationOrchestrationSlices.map((type) => ({ type }))],
-              },
-            },
-            {
-              from: { type: "application-flows" },
-              disallow: {
-                to: [...applicationOrchestrationSlices.map((type) => ({ type }))],
-              },
-            },
-            {
-              from: { type: "application-ports" },
-              disallow: {
-                to: [...applicationOrchestrationSlices.map((type) => ({ type }))],
-              },
-            },
-            {
-              from: { type: "application-mappers" },
-              disallow: {
-                to: [...applicationOrchestrationSlices.map((type) => ({ type }))],
-              },
-            },
-            {
-              from: { type: "application-other" },
-              disallow: {
-                to: [...applicationOrchestrationSlices.map((type) => ({ type }))],
-              },
+              allow: { to: [{ type: "ui" }] },
             },
           ],
         },

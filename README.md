@@ -85,7 +85,7 @@ This is where packages with **domain / application / infrastructure code** live,
 
 - **`packages/ui/*`**
   - View-facing UI packages (components, screens) scoped as `@ui/<name>` (e.g. `packages/ui/react` → `@ui/react`).
-  - May depend on application DTOs and composition; must not import domain, use-cases, flows, or infrastructure directly (see ESLint `boundaries`).
+  - May depend on **composition only**; must not import domain, application (including DTOs), or infrastructure directly (see ESLint `boundaries`). Data reaches UI via the composition layer.
 
 - **`apps/*`**
   - Next.js, Nest, or other runnable apps.
@@ -138,7 +138,13 @@ Key aspects of the shared config:
 
 - uses `@eslint/js` + `typescript-eslint` (flat config)
 - defines architectural layers via `eslint-plugin-boundaries`
-- `eslint-plugin-boundaries`: layers are split into **explicit element types** (no broad `application` / `domain` / `infrastructure` catch-alls): e.g. **`application-dtos`**, **`application-use-cases`**, **`application-flows`**, **`application-modules`**, **`application-ports`**, **`application-mappers`**, **`application-other`**; **`domain-errors`**, **`domain-value-objects`**, **`domain-entities`**, **`domain-services`**, **`domain-utils`**, **`domain-other`**; **`infrastructure-driven-repository`**, **`infrastructure-driven`**, **`infrastructure-lib`**, **`infrastructure-other`**. Only **`composition`** may depend on **`application-modules`**; wire modules from the composition root.
+- `eslint-plugin-boundaries`: layers are split into **explicit element types** (no broad `application` / `domain` / `infrastructure` catch-alls): e.g. **`application-dtos`**, **`application-use-cases`**, **`application-flows`**, **`application-modules`**, **`application-interaction-ports`** (`*.interaction.port.*`), **`application-ports`**, **`application-mappers`**, **`application-other`**; **`domain-errors`**, **`domain-value-objects`**, **`domain-entities`**, **`domain-services`**, **`domain-utils`**, **`domain-other`**; **`infrastructure-driven-repository`**, **`infrastructure-driven`**, **`infrastructure-lib`**, **`infrastructure-other`**. Key boundary rules:
+  - **Domain** must not import anything above itself (no application / infrastructure / composition / UI / apps).
+  - **Application orchestration** (`use-cases`, `flows`, `modules`) must not import each other; they are independent and composed externally. `mappers` are logic (not orchestration) and may be imported by use-cases/flows.
+  - **Infrastructure** must not import application logic (`use-cases`, `flows`, `modules`, `mappers`); driven-repository adapters may import domain entities; non-repository driven adapters are limited to domain errors and value-objects.
+  - **Composition** may import anything except `apps` and `ui`; it is the only place that wires modules.
+  - **Apps** may import only `@composition/*`, **`application-dtos`** (use-case result shapes) and **`application-interaction-ports`** (`*.interaction.port.*` files — `InteractionPort` types needed by UI-driven flows); plain ports, orchestration, and all other application/domain/infrastructure layers are forbidden.
+  - **UI** must not import any application slice (including DTOs), domain, or infrastructure; all data flows in through composition.
 
 ### Lint scripts
 
