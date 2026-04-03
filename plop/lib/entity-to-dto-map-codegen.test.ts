@@ -26,12 +26,16 @@ describe("generateApplicationEntityMapperSources", () => {
     expect(out.dtoSource).toContain("id: string");
     expect(out.dtoSource).toContain("title: string");
     expect(out.dtoSource).toContain("count: number");
+    expect(out.dtoSource).toMatch(/locale:\s*\{[^}]*language:\s*string[^}]*country:\s*string/s);
 
     expect(out.mapperSource).toContain("snapshot.id.value");
     expect(out.mapperSource).toContain("snapshot.title");
     expect(out.mapperSource).toContain("snapshot.count");
+    expect(out.mapperSource).toContain("snapshot.locale.getProps()");
 
     expect(out.testSource).toContain("mapTicketToDTO");
     expect(out.testSource).toContain("toEqual");
+    expect(out.testSource).toContain("new TicketEntity(");
+    expect(out.testSource).not.toMatch(/as unknown/);
   });
 });

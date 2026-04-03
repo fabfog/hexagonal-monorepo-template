@@ -108,6 +108,354 @@ function findExportedClassDeclaration(sf, className) {
 }
 
 /**
+ * @param {ts.ClassDeclaration} classDecl
+ * @returns {ts.ConstructorDeclaration | undefined}
+ */
+function findConstructorDeclaration(classDecl) {
+  for (const member of classDecl.members) {
+    if (ts.isConstructorDeclaration(member)) return member;
+  }
+  return undefined;
+}
+
+/**
+ * Type of the first constructor parameter (e.g. `TicketProps` on `constructor(props: TicketProps)`).
+ * @param {ts.TypeChecker} checker
+ * @param {ts.ClassDeclaration} classDecl
+ * @returns {ts.Type | undefined}
+ */
+function getConstructorFirstParameterType(checker, classDecl) {
+  const ctor = findConstructorDeclaration(classDecl);
+  if (!ctor || ctor.parameters.length === 0) return undefined;
+  const p0 = ctor.parameters[0];
+  if (!p0.type) return undefined;
+  return checker.getTypeFromTypeNode(p0.type);
+}
+
+/**
+ * @param {string} propName
+ */
+function defaultStringLiteralForProp(propName) {
+  const n = String(propName).toLowerCase();
+  if (n.includes("email")) return JSON.stringify("stub@example.com");
+  if (n === "slug" || n.endsWith("slug")) return JSON.stringify("stub-slug");
+  if (n.includes("url") || n.includes("href")) return JSON.stringify("https://example.test/stub");
+  return JSON.stringify(`stub-${propName}`);
+}
+
+/**
+ * @param {string} fieldName e.g. language, country
+ */
+function defaultStringForNestedObjectField(fieldName) {
+  const n = fieldName.toLowerCase();
+  if (n === "language") return JSON.stringify("en");
+  if (n === "country") return JSON.stringify("US");
+  return JSON.stringify(`stub-${fieldName}`);
+}
+
+/**
+ * @param {ts.Symbol} symbol
+ * @param {string} repoRoot
+ * @returns {string} e.g. `@domain/core/value-objects`
+ */
+function workspaceImportModuleForSymbol(symbol, repoRoot) {
+  const decl = symbol.valueDeclaration ?? symbol.declarations?.[0];
+  if (!decl) {
+    throw new Error(
+      `Codegen: symbol "${symbol.name}" has no declaration for import path resolution.`
+    );
+  }
+  const file = decl.getSourceFile().fileName.replace(/\\/g, "/");
+  const normRoot = repoRoot.replace(/\\/g, "/");
+  const rel = path.relative(normRoot, file).replace(/\\/g, "/");
+  const m = rel.match(/^packages\/domain\/([^/]+)\/src\/(entities|value-objects)\//);
+  if (!m) {
+    throw new Error(
+      `Codegen: declare "${symbol.name}" under packages/domain/<pkg>/src/entities or value-objects so the mapper test can import it (got "${rel}").`
+    );
+  }
+  const pkg = m[1];
+  const slice = m[2];
+  return `@domain/${pkg}/${slice}`;
+}
+
+/**
+ * @param {Map<string, Set<string>>} acc
+ * @param {string} module
+ * @param {string} name
+ */
+function addImport(acc, module, name) {
+  if (!acc.has(module)) acc.set(module, new Set());
+  acc.get(module).add(name);
+}
+
+/**
+ * @param {ts.Type} objType
+ * @param {ts.TypeChecker} checker
+ */
+function buildPlainObjectLiteralForType(objType, checker) {
+  const apparent = checker.getApparentType(objType);
+  const props = checker.getPropertiesOfType(apparent);
+  if (props.length === 0) {
+    return "{}";
+  }
+  const parts = [];
+  for (const p of props) {
+    const n = p.getName();
+    if (n.startsWith("__")) continue;
+    const optional = (p.getFlags() & ts.SymbolFlags.Optional) !== 0;
+    if (optional) continue;
+    const pt = checker.getTypeOfPropertyOfType(apparent, n);
+    if (!pt) continue;
+    const ps = checker.typeToString(pt);
+    if (ps === "string") {
+      parts.push(`${n}: ${defaultStringForNestedObjectField(n)}`);
+    } else if (ps === "number") {
+      parts.push(`${n}: 7`);
+    } else if (ps === "boolean") {
+      parts.push(`${n}: true`);
+    } else {
+      throw new Error(
+        `Codegen: unsupported nested property "${n}" type "${ps}" in constructor arg object literal — use primitives or extend entity-to-dto-map-codegen.cjs.`
+      );
+    }
+  }
+  return `{ ${parts.join(", ")} }`;
+}
+
+/**
+ * @param {string} propName
+ * @param {ts.Type} propType
+ * @param {ts.TypeChecker} checker
+ * @param {string} repoRoot
+ * @param {Map<string, Set<string>>} importAcc
+ * @returns {string}
+ */
+function buildConstructorArgExpression(propName, propType, checker, repoRoot, importAcc) {
+  const t = checker.getApparentType(propType);
+  const typeStr = checker.typeToString(t);
+  const norm = typeStr.toLowerCase();
+
+  if (norm === "string") {
+    return defaultStringLiteralForProp(propName);
+  }
+  if (norm === "number") {
+    return "42";
+  }
+  if (norm === "boolean") {
+    return "true";
+  }
+  if (norm === "bigint") {
+    return "9n";
+  }
+  if (norm === "date" || typeStr.includes("Date")) {
+    return "new Date('2020-01-01T00:00:00.000Z')";
+  }
+
+  let sigs = t.getConstructSignatures();
+  if (sigs.length === 0 && t.symbol) {
+    const ctorSide = checker.getTypeOfSymbol(t.symbol);
+    if (ctorSide) {
+      sigs = ctorSide.getConstructSignatures();
+    }
+  }
+  if (sigs.length === 0) {
+    throw new Error(
+      `Codegen: cannot scaffold constructor arg for property "${propName}" (type "${typeStr}") — no construct signatures.`
+    );
+  }
+
+  const sig = sigs[0];
+  const decl = sig.declaration;
+  if (
+    !ts.isConstructorDeclaration(decl) ||
+    !ts.isClassDeclaration(decl.parent) ||
+    !decl.parent.name
+  ) {
+    throw new Error(
+      `Codegen: could not resolve class for constructor of "${propName}" (${typeStr}).`
+    );
+  }
+  const classSym = checker.getSymbolAtLocation(decl.parent.name);
+  if (!classSym) {
+    throw new Error(`Codegen: missing class symbol for "${propName}" (${typeStr}).`);
+  }
+  const className = classSym.getEscapedName ? classSym.getEscapedName() : classSym.name;
+
+  const ctorDecl = decl;
+  if (ctorDecl.parameters.length === 0) {
+    const mod = workspaceImportModuleForSymbol(classSym, repoRoot);
+    addImport(importAcc, mod, className);
+    return `new ${className}()`;
+  }
+
+  if (ctorDecl.parameters.length !== 1) {
+    throw new Error(
+      `Codegen: ${className} constructor must have 0 or 1 parameter to scaffold mapper tests (property "${propName}").`
+    );
+  }
+
+  const p0 = ctorDecl.parameters[0];
+  const paramType = checker.getTypeAtLocation(p0);
+  const mod = workspaceImportModuleForSymbol(classSym, repoRoot);
+  addImport(importAcc, mod, className);
+
+  const paramStr = checker.typeToString(paramType);
+  if (
+    paramStr === "string" ||
+    paramStr === "number" ||
+    paramStr === "boolean" ||
+    paramStr === "bigint"
+  ) {
+    if (paramStr === "string") return `new ${className}(${defaultStringLiteralForProp(propName)})`;
+    if (paramStr === "number") return `new ${className}(42)`;
+    if (paramStr === "boolean") return `new ${className}(true)`;
+    return `new ${className}(9n)`;
+  }
+
+  if (paramStr === "Date" || paramStr.includes("Date")) {
+    return `new ${className}(new Date('2020-01-01T00:00:00.000Z'))`;
+  }
+
+  const inner = buildPlainObjectLiteralForType(paramType, checker);
+  return `new ${className}(${inner})`;
+}
+
+/**
+ * @param {ts.TypeChecker} checker
+ * @param {ts.ClassDeclaration} classDecl
+ * @param {string} entityPascal
+ * @param {string} entityClassName
+ * @param {string[]} sortedFieldNames from toSnapshot / DTO order
+ * @param {string} entityDomainPackage
+ * @param {string} repoRoot
+ * @returns {{ importAcc: Map<string, Set<string>>, entityConstruction: string }}
+ */
+function buildEntityTestConstruction(
+  checker,
+  classDecl,
+  entityPascal,
+  entityClassName,
+  sortedFieldNames,
+  entityDomainPackage,
+  repoRoot
+) {
+  /** @type {Map<string, Set<string>>} */
+  const importAcc = new Map();
+  const entitiesMod = `@domain/${entityDomainPackage}/entities`;
+  addImport(importAcc, entitiesMod, entityClassName);
+
+  const ctor = findConstructorDeclaration(classDecl);
+  if (!ctor) {
+    throw new Error(
+      `Codegen: ${entityClassName} has no constructor — cannot scaffold a real entity in the mapper test.`
+    );
+  }
+
+  if (ctor.parameters.length === 0) {
+    if (sortedFieldNames.length > 0) {
+      throw new Error(
+        `Codegen: ${entityClassName} has a zero-arg constructor but toSnapshot() exposes properties — add a constructor parameter typed as *Props.`
+      );
+    }
+    return { importAcc, entityConstruction: `const entity = new ${entityClassName}();` };
+  }
+
+  const ctorPropsType = getConstructorFirstParameterType(checker, classDecl);
+  if (!ctorPropsType) {
+    throw new Error(
+      `Codegen: add an explicit type to ${entityClassName}'s constructor first parameter (e.g. \`constructor(props: ${entityPascal}Props)\`) so the mapper test can call \`new ${entityClassName}({ ... })\` without type assertions.`
+    );
+  }
+
+  const lines = [];
+  for (const name of sortedFieldNames) {
+    const sym = checker.getPropertyOfType(ctorPropsType, name);
+    if (!sym) {
+      throw new Error(
+        `Codegen: property "${name}" appears on toSnapshot() but not on the constructor parameter type — align ${entityPascal}Props (or the constructor annotation) with the snapshot shape.`
+      );
+    }
+    const optional = (sym.getFlags() & ts.SymbolFlags.Optional) !== 0;
+    if (optional) {
+      throw new Error(
+        `Codegen: optional snapshot property "${name}" is not supported in generated mapper tests yet — make it required on ${entityPascal}Props or adjust the test manually.`
+      );
+    }
+    const pt = checker.getTypeOfPropertyOfType(ctorPropsType, name);
+    if (!pt) {
+      throw new Error(`Codegen: could not resolve type for constructor prop "${name}".`);
+    }
+    const expr = buildConstructorArgExpression(name, pt, checker, repoRoot, importAcc);
+    lines.push(`      ${name}: ${expr},`);
+  }
+
+  const objectBody = lines.length > 0 ? `\n${lines.join("\n")}\n    ` : "";
+  const entityConstruction = `const entity = new ${entityClassName}({${objectBody}});`;
+
+  return { importAcc, entityConstruction };
+}
+
+/**
+ * @param {Map<string, Set<string>>} importAcc
+ * @param {string} entityKebab
+ * @param {string} fn mapXToDTO
+ */
+function formatTestImportLines(importAcc, entityKebab, fn) {
+  /** @type {string[]} */
+  const out = [];
+  out.push(`import { describe, it, expect } from "vitest";`);
+  const mods = [...importAcc.keys()].sort((a, b) => a.localeCompare(b));
+  for (const mod of mods) {
+    const names = [...importAcc.get(mod)].sort((a, b) => a.localeCompare(b));
+    out.push(`import { ${names.join(", ")} } from "${mod}";`);
+  }
+  if (entityKebab && fn) {
+    out.push(`import { ${fn} } from "./${entityKebab}.mapper";`);
+  }
+  return out;
+}
+
+/**
+ * @param {ts.TypeChecker} checker
+ * @param {ts.ClassDeclaration} classDecl
+ * @param {string} entityClassName
+ */
+function buildEmptyEntityTestConstruction(
+  checker,
+  classDecl,
+  entityClassName,
+  entityDomainPackage
+) {
+  /** @type {Map<string, Set<string>>} */
+  const importAcc = new Map();
+  addImport(importAcc, `@domain/${entityDomainPackage}/entities`, entityClassName);
+  const ctor = findConstructorDeclaration(classDecl);
+  if (ctor && ctor.parameters.length === 0) {
+    return {
+      importAcc,
+      entityConstruction: `const entity = new ${entityClassName}();`,
+    };
+  }
+  const ctorPropsType = ctor ? getConstructorFirstParameterType(checker, classDecl) : undefined;
+  if (ctorPropsType) {
+    const props = checker
+      .getPropertiesOfType(ctorPropsType)
+      .filter((p) => !p.getName().startsWith("__"));
+    const allOptional = props.every((p) => (p.getFlags() & ts.SymbolFlags.Optional) !== 0);
+    if (props.length === 0 || allOptional) {
+      return {
+        importAcc,
+        entityConstruction: `const entity = new ${entityClassName}({});`,
+      };
+    }
+  }
+  throw new Error(
+    `Codegen: empty toSnapshot() but ${entityClassName} requires constructor arguments — cannot scaffold mapper test without \`as unknown\`; add optional props or a no-arg constructor.`
+  );
+}
+
+/**
  * @param {ts.Type} t
  * @param {ts.TypeChecker} checker
  * @returns {ts.Type | undefined}
@@ -117,6 +465,86 @@ function typeOfValueGetter(t, checker) {
   const sym = apparent.getProperty("value");
   if (!sym) return undefined;
   return checker.getTypeOfSymbol(sym);
+}
+
+/**
+ * @param {ts.Type} t
+ * @param {ts.TypeChecker} checker
+ * @param {string} methodName
+ * @returns {ts.Type | undefined}
+ */
+function returnTypeOfZeroArgMethod(t, checker, methodName) {
+  const apparent = checker.getApparentType(t);
+  const sym = apparent.getProperty(methodName);
+  if (!sym) return undefined;
+  const decl = sym.valueDeclaration ?? sym.declarations?.[0];
+  if (!decl) return undefined;
+  if (ts.isMethodDeclaration(decl) || ts.isMethodSignature(decl)) {
+    const sig = checker.getSignatureFromDeclaration(decl);
+    if (sig && sig.parameters.length === 0) {
+      return checker.getReturnTypeOfSignature(sig);
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Prefer a plain object literal shape in DTOs when the type is `Readonly<{ ... }>`.
+ * @param {string} typeStr
+ */
+function simplifyReadonlyObjectWrapper(typeStr) {
+  const trimmed = typeStr.trim();
+  const m = trimmed.match(/^Readonly<\s*(\{[\s\S]*\})\s*>$/);
+  if (m) return m[1].trim();
+  return trimmed;
+}
+
+/**
+ * Build test stub / expected literal for an object type (VO props / getProps result).
+ * @param {ts.Type} objectLike
+ * @param {ts.TypeChecker} checker
+ * @returns {{ stubSnapshotExpr: string, expectedLiteral: string } | null}
+ */
+function objectLiteralStubForType(objectLike, checker) {
+  const apparent = checker.getApparentType(objectLike);
+  const props = checker.getPropertiesOfType(apparent);
+  if (props.length === 0) {
+    return {
+      stubSnapshotExpr: `{ getProps: () => ({}) }`,
+      expectedLiteral: `{}`,
+    };
+  }
+  /** @type {string[]} */
+  const stubParts = [];
+  /** @type {string[]} */
+  const expParts = [];
+  for (const p of props) {
+    const n = p.getName();
+    if (n.startsWith("__")) continue;
+    const pt = checker.getTypeOfPropertyOfType(apparent, n);
+    if (!pt) continue;
+    const ps = checker.typeToString(pt);
+    let stubVal;
+    let expVal;
+    if (ps === "string") {
+      stubVal = defaultStringForNestedObjectField(n);
+      expVal = stubVal;
+    } else if (ps === "number") {
+      stubVal = "7";
+      expVal = "7";
+    } else if (ps === "boolean") {
+      stubVal = "true";
+      expVal = "true";
+    } else {
+      return null;
+    }
+    stubParts.push(`${n}: ${stubVal}`);
+    expParts.push(`${n}: ${expVal}`);
+  }
+  return {
+    stubSnapshotExpr: `{ getProps: () => ({ ${stubParts.join(", ")} }) }`,
+    expectedLiteral: `{ ${expParts.join(", ")} }`,
+  };
 }
 
 /**
@@ -130,7 +558,7 @@ function isPrimitiveTypeString(s) {
  * @param {ts.Type} t
  * @param {ts.TypeChecker} checker
  * @param {string} propName
- * @returns {{ dtoType: string, mapperExpr: string, stubSnapshotExpr: string, expectedLiteral: string, mapperKind: 'voValue' | 'direct' | 'todo' }}
+ * @returns {{ dtoType: string, mapperExpr: string, stubSnapshotExpr: string, expectedLiteral: string, mapperKind: 'voValue' | 'voGetProps' | 'direct' | 'todo' }}
  */
 function describePropertyMapping(t, checker, propName) {
   const typeStr = checker.typeToString(t);
@@ -166,22 +594,43 @@ function describePropertyMapping(t, checker, propName) {
     };
   }
 
+  const getPropsReturn = returnTypeOfZeroArgMethod(t, checker, "getProps");
+  if (getPropsReturn) {
+    const dtoRaw = checker.typeToString(
+      getPropsReturn,
+      undefined,
+      ts.TypeFormatFlags.NoTruncation | ts.TypeFormatFlags.InTypeAlias
+    );
+    const dtoType = simplifyReadonlyObjectWrapper(dtoRaw);
+    const stubs = objectLiteralStubForType(getPropsReturn, checker);
+    if (stubs) {
+      return {
+        dtoType,
+        mapperExpr: `snapshot.${propName}.getProps()`,
+        stubSnapshotExpr: stubs.stubSnapshotExpr,
+        expectedLiteral: stubs.expectedLiteral,
+        mapperKind: "voGetProps",
+      };
+    }
+  }
+
+  const primNorm = typeStr.toLowerCase();
   if (
-    typeStr === "string" ||
-    typeStr === "number" ||
-    typeStr === "boolean" ||
-    typeStr === "bigint"
+    primNorm === "string" ||
+    primNorm === "number" ||
+    primNorm === "boolean" ||
+    primNorm === "bigint"
   ) {
     const lit =
-      typeStr === "string"
-        ? JSON.stringify(`s-${propName}`)
-        : typeStr === "number"
+      primNorm === "string"
+        ? defaultStringLiteralForProp(propName)
+        : primNorm === "number"
           ? "42"
-          : typeStr === "boolean"
+          : primNorm === "boolean"
             ? "true"
             : "9n";
     return {
-      dtoType: typeStr,
+      dtoType: primNorm === "string" ? "string" : primNorm,
       mapperExpr: `snapshot.${propName}`,
       stubSnapshotExpr: lit,
       expectedLiteral: lit,
@@ -253,47 +702,26 @@ export function ${fn}(entity: ${entityClass}): ${dtoType} {
  *   entityKebab: string,
  *   domainPackage: string,
  *   applicationPackage: string,
- *   fields: { name: string, stubSnapshotExpr: string, expectedLiteral: string, mapperKind: string }[]
+ *   fields: { name: string, stubSnapshotExpr: string, expectedLiteral: string, mapperKind: string }[],
+ *   importAcc: Map<string, Set<string>>,
+ *   entityConstruction: string,
  * }} args
  */
 function buildMapperTestSource(args) {
-  const { entityPascal, entityKebab, domainPackage, fields } = args;
-  const entityClass = `${entityPascal}Entity`;
+  const { entityPascal, entityKebab, fields, importAcc, entityConstruction } = args;
   const fn = `map${entityPascal}ToDTO`;
 
-  if (fields.length === 0) {
-    return `import { describe, it, expect } from "vitest";
-import { ${fn} } from "./${entityKebab}.mapper";
-import type { ${entityClass} } from "@domain/${domainPackage}/entities";
-
-describe("${fn}", () => {
-  it("returns an empty DTO for an entity with an empty snapshot", () => {
-    const entity = {
-      toSnapshot: () => ({}),
-    } as unknown as ${entityClass};
-    expect(${fn}(entity)).toEqual({});
-  });
-});
-`;
-  }
-
-  const snapshotBody = fields.map((f) => `        ${f.name}: ${f.stubSnapshotExpr},`).join("\n");
+  const importLines = formatTestImportLines(importAcc, entityKebab, fn);
   const expectedBody = fields.map((f) => `      ${f.name}: ${f.expectedLiteral},`).join("\n");
+  const expectedInner = fields.length === 0 ? "" : `\n${expectedBody}\n    `;
+  const itTitle = "maps entity fields to the DTO";
 
-  return `import { describe, it, expect } from "vitest";
-import { ${fn} } from "./${entityKebab}.mapper";
-import type { ${entityClass} } from "@domain/${domainPackage}/entities";
+  return `${importLines.join("\n")}
 
 describe("${fn}", () => {
-  it("maps snapshot fields to the DTO", () => {
-    const entity = {
-      toSnapshot: () => ({
-${snapshotBody}
-      }),
-    } as unknown as ${entityClass};
-    expect(${fn}(entity)).toEqual({
-${expectedBody}
-    });
+  it("${itTitle}", () => {
+    ${entityConstruction}
+    expect(${fn}(entity)).toEqual({${expectedInner}});
   });
 });
 `;
@@ -435,12 +863,34 @@ function generateApplicationEntityMapperSources(opts) {
     fields,
   });
 
+  let testConstruction;
+  if (fields.length === 0) {
+    testConstruction = buildEmptyEntityTestConstruction(
+      checker,
+      classDecl,
+      entityClassName,
+      domainPackage
+    );
+  } else {
+    testConstruction = buildEntityTestConstruction(
+      checker,
+      classDecl,
+      entityPascal,
+      entityClassName,
+      fields.map((f) => f.name),
+      domainPackage,
+      repoRoot
+    );
+  }
+
   const testSource = buildMapperTestSource({
     entityPascal,
     entityKebab,
     domainPackage,
     applicationPackage,
     fields,
+    importAcc: testConstruction.importAcc,
+    entityConstruction: testConstruction.entityConstruction,
   });
 
   return { dtoSource, mapperSource, testSource };

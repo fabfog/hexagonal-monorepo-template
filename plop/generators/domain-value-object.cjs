@@ -3,13 +3,13 @@ const {
   getDomainPackageChoices,
   ensureZodDependencyInDomainPackage,
 } = require("../lib");
-const { appendDomainValueObjectZodActions } = require("../lib/domain-value-object-zod.cjs");
+const { appendDomainValueObjectActions } = require("../lib/domain-value-object.cjs");
 
 const repoRoot = getRepoRoot();
 
 /** @param {import('plop').NodePlopAPI} plop */
-module.exports = function registerDomainValueObjectZodGenerator(plop) {
-  plop.setGenerator("domain-value-object-zod", {
+module.exports = function registerDomainValueObjectGenerator(plop) {
+  plop.setGenerator("domain-value-object", {
     description:
       "Add a Value Object (single value VO or composite VO) to an existing @domain/* package",
     prompts: [
@@ -55,7 +55,7 @@ module.exports = function registerDomainValueObjectZodGenerator(plop) {
       const { domainPackage, valueObjectName, valueObjectKind, singleValuePrimitive } = data;
 
       const actions = [];
-      appendDomainValueObjectZodActions(actions, {
+      appendDomainValueObjectActions(actions, {
         repoRoot,
         domainPackage,
         valueObjectName,

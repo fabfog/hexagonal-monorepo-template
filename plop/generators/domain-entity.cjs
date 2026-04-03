@@ -6,15 +6,16 @@ const {
   ensureZodDependencyInDomainPackage,
 } = require("../lib");
 const { appendEnsureEntityNotFoundErrorActions } = require("../lib/entity-not-found-error.cjs");
-const { appendDomainValueObjectZodActions } = require("../lib/domain-value-object-zod.cjs");
+const { appendDomainValueObjectActions } = require("../lib/domain-value-object.cjs");
 const { ensureDomainPackageSlice } = require("../lib/ensure-package-slice.cjs");
 
 const repoRoot = getRepoRoot();
 
 /** @param {import('plop').NodePlopAPI} plop */
-module.exports = function registerDomainEntityZodGenerator(plop) {
-  plop.setGenerator("domain-entity-zod", {
-    description: "Add a new Domain Entity with Zod schema to an existing @domain/* package",
+module.exports = function registerDomainEntityGenerator(plop) {
+  plop.setGenerator("domain-entity", {
+    description:
+      "Add a new Domain Entity to an existing @domain/* package (schema, types, class in one file)",
     prompts: [
       {
         type: "list",
@@ -46,7 +47,7 @@ module.exports = function registerDomainEntityZodGenerator(plop) {
 
       const actions = [];
 
-      appendDomainValueObjectZodActions(actions, {
+      appendDomainValueObjectActions(actions, {
         repoRoot,
         domainPackage,
         valueObjectName: `${entityPascal}Id`,
@@ -62,12 +63,12 @@ module.exports = function registerDomainEntityZodGenerator(plop) {
         {
           type: "add",
           path: "../packages/domain/{{domainPackage}}/src/entities/{{kebabCase entityName}}.entity.ts",
-          templateFile: "templates/domain-entity-zod/entity.ts.hbs",
+          templateFile: "templates/domain-entity/entity.ts.hbs",
         },
         {
           type: "add",
           path: "../packages/domain/{{domainPackage}}/src/entities/{{kebabCase entityName}}.entity.test.ts",
-          templateFile: "templates/domain-entity-zod/entity.test.ts.hbs",
+          templateFile: "templates/domain-entity/entity.test.ts.hbs",
         },
         {
           type: "modify",

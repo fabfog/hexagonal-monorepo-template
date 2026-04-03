@@ -10,7 +10,7 @@
  * package (`src/index.ts`). No secondary Port + driven-port-adapter yet (empty "other" ports
  * break that generator until the port defines methods).
  *
- * After the Ticket entity, `domain-entity-add-vo-field` adds Slug (@domain/core). The demo scaffolds
+ * After the Ticket entity (`domain-entity`), `domain-entity-add-vo-field` adds Slug (@domain/core). The demo scaffolds
  * example VOs under @domain/demo-support (including DemoComposite as a standalone sample), then adds
  * more Ticket fields: Email + Locale from core, DemoString + DemoBoolean from the same package.
  *
@@ -75,7 +75,7 @@ const STEPS = /** @type {DemoStep[]} */ ([
     answers: { name: DEMO_DOMAIN },
   },
   {
-    name: "domain-entity-zod",
+    name: "domain-entity",
     note: "Ticket + TicketId VO + TicketNotFoundError",
     answers: {
       domainPackage: DEMO_DOMAIN,
@@ -94,7 +94,7 @@ const STEPS = /** @type {DemoStep[]} */ ([
     },
   },
   {
-    name: "domain-value-object-zod",
+    name: "domain-value-object",
     note: "Example single-value VO (string) for docs / onboarding",
     answers: {
       domainPackage: DEMO_DOMAIN,
@@ -104,7 +104,7 @@ const STEPS = /** @type {DemoStep[]} */ ([
     },
   },
   {
-    name: "domain-value-object-zod",
+    name: "domain-value-object",
     note: "Example single-value VO (boolean)",
     answers: {
       domainPackage: DEMO_DOMAIN,
@@ -114,7 +114,7 @@ const STEPS = /** @type {DemoStep[]} */ ([
     },
   },
   {
-    name: "domain-value-object-zod",
+    name: "domain-value-object",
     note: "Example single-value VO (number)",
     answers: {
       domainPackage: DEMO_DOMAIN,
@@ -124,7 +124,7 @@ const STEPS = /** @type {DemoStep[]} */ ([
     },
   },
   {
-    name: "domain-value-object-zod",
+    name: "domain-value-object",
     note: "Example single-value VO (Date)",
     answers: {
       domainPackage: DEMO_DOMAIN,
@@ -134,7 +134,7 @@ const STEPS = /** @type {DemoStep[]} */ ([
     },
   },
   {
-    name: "domain-value-object-zod",
+    name: "domain-value-object",
     note: "Example composite VO (z.object + getProps + deepEqual equals)",
     answers: {
       domainPackage: DEMO_DOMAIN,

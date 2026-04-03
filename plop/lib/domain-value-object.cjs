@@ -2,15 +2,15 @@ const { toKebabCase } = require("./casing.cjs");
 const { ensureDomainPackageSlice } = require("./ensure-package-slice.cjs");
 
 /**
- * Appends the same "add .vo.ts + patch value-objects/index.ts" steps as generator `domain-value-object-zod`.
+ * Appends "add .vo.ts + patch value-objects/index.ts" steps (same as generator `domain-value-object`).
  *
  * @param {unknown[]} actions
  * @param {{ repoRoot: string, domainPackage: string, valueObjectName: string, valueObjectKind?: 'single-value' | 'composite', singleValuePrimitive?: 'string' | 'boolean' | 'number' | 'Date' }} opts
  */
-function appendDomainValueObjectZodActions(actions, opts) {
+function appendDomainValueObjectActions(actions, opts) {
   const { repoRoot, domainPackage, valueObjectName } = opts;
   if (!repoRoot) {
-    throw new Error("appendDomainValueObjectZodActions requires repoRoot");
+    throw new Error("appendDomainValueObjectActions requires repoRoot");
   }
   const valueObjectKind = opts.valueObjectKind ?? "single-value";
   const singleValuePrimitive = opts.singleValuePrimitive ?? "string";
@@ -37,8 +37,8 @@ function appendDomainValueObjectZodActions(actions, opts) {
   };
   const templateFile =
     valueObjectKind === "composite"
-      ? "templates/domain-value-object-zod/value-object-composite.ts.hbs"
-      : "templates/domain-value-object-zod/value-object-single-value.ts.hbs";
+      ? "templates/domain-value-object/value-object-composite.ts.hbs"
+      : "templates/domain-value-object/value-object-single-value.ts.hbs";
 
   actions.unshift(() => {
     ensureDomainPackageSlice(repoRoot, domainPackage, "value-objects");
@@ -69,4 +69,4 @@ function appendDomainValueObjectZodActions(actions, opts) {
   );
 }
 
-module.exports = { appendDomainValueObjectZodActions };
+module.exports = { appendDomainValueObjectActions };
