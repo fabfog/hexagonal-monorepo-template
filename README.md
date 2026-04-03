@@ -34,6 +34,7 @@ Optional: validate config locally with `npx -p renovate renovate-config-validato
 - `pnpm format:check` – Check formatting without modifying files
 - `pnpm deps:lint` – Enforce dependency rules with dependency-cruiser (see `.dependency-cruiser.cjs`)
 - `pnpm deps:graph` – Open an HTML **package-level** graph (Mermaid, colors by layer under `packages/`). Output is written to `.dependency-cruiser-report/` (gitignored). With Graphviz `dot` on `PATH`, a `packages.svg` is also generated from `packages.dot`.
+- `pnpm deps:graph:composition` – Open **composition wiring**: `@composition/*` (sources under `src/`) → referenced `@application/*` packages → `src/modules/*.module.ts` → use-cases and flows matched by path patterns in module source (see script hint in the HTML). Writes `composition-wiring.html` (and `.mmd` / `.dot`) under `.dependency-cruiser-report/`.
 
 ---
 

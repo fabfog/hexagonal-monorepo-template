@@ -14,6 +14,7 @@
     "deps:renovate": "npx -p renovate renovate-config-validator renovate.json",
     "deps:lint": "depcruise --config .dependency-cruiser.cjs packages -T err",
     "deps:graph": "node scripts/deps-graph-html-open.cjs",
+    "deps:graph:composition": "node scripts/deps-composition-graph-open.cjs",
     "demo:generate": "node scripts/demo/generate-demo-stack.cjs",
     "demo:remove": "node scripts/demo/remove-demo-stack.cjs"
   },
