@@ -500,6 +500,34 @@ function simplifyReadonlyObjectWrapper(typeStr) {
 }
 
 /**
+ * DTO interfaces are descriptive snapshots: drop `readonly` on object properties so they match
+ * plain fields like `string` (TypeScript often prints `readonly` from `getProps(): Readonly<...>`).
+ * Preserves built-ins such as `ReadonlyArray<` / `ReadonlyMap<` / `ReadonlySet<`.
+ * @param {string} typeStr
+ */
+function stripReadonlyPropertyModifiersFromDtoType(typeStr) {
+  /** @type {string[]} */
+  const protectedChunks = [];
+  let s = typeStr.replace(/ReadonlyArray<|ReadonlyMap<|ReadonlySet</g, (match) => {
+    const i = protectedChunks.length;
+    protectedChunks.push(match);
+    return `§§${i}§§`;
+  });
+  s = s.replace(/\breadonly\s+/g, "");
+  for (let i = 0; i < protectedChunks.length; i++) {
+    s = s.split(`§§${i}§§`).join(protectedChunks[i]);
+  }
+  return s;
+}
+
+/**
+ * @param {string} typeStr
+ */
+function normalizeGetPropsDtoTypeString(typeStr) {
+  return stripReadonlyPropertyModifiersFromDtoType(simplifyReadonlyObjectWrapper(typeStr));
+}
+
+/**
  * Build test stub / expected literal for an object type (VO props / getProps result).
  * @param {ts.Type} objectLike
  * @param {ts.TypeChecker} checker
@@ -601,7 +629,7 @@ function describePropertyMapping(t, checker, propName) {
       undefined,
       ts.TypeFormatFlags.NoTruncation | ts.TypeFormatFlags.InTypeAlias
     );
-    const dtoType = simplifyReadonlyObjectWrapper(dtoRaw);
+    const dtoType = normalizeGetPropsDtoTypeString(dtoRaw);
     const stubs = objectLiteralStubForType(getPropsReturn, checker);
     if (stubs) {
       return {

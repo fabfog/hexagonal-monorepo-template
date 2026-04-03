@@ -27,6 +27,7 @@ describe("generateApplicationEntityMapperSources", () => {
     expect(out.dtoSource).toContain("title: string");
     expect(out.dtoSource).toContain("count: number");
     expect(out.dtoSource).toMatch(/locale:\s*\{[^}]*language:\s*string[^}]*country:\s*string/s);
+    expect(out.dtoSource).not.toContain("readonly");
 
     expect(out.mapperSource).toContain("snapshot.id.value");
     expect(out.mapperSource).toContain("snapshot.title");
