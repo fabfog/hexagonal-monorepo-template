@@ -133,7 +133,7 @@ const STEPS = /** @type {DemoStep[]} */ ([
   },
   {
     name: "__pnpm_install__",
-    note: "pnpm install (so TypeScript can resolve zod + @domain/* for DTO/mapper codegen)",
+    note: "intermediate pnpm install (so TypeScript can resolve zod + @domain/* for DTO/mapper codegen)",
     run: () => {
       const result = spawnSync("pnpm", ["install"], {
         cwd: REPO_ROOT,
@@ -258,6 +258,24 @@ const STEPS = /** @type {DemoStep[]} */ ([
     name: "composition-package",
     note: "Composition root (src/index.ts + exports)",
     answers: { name: DEMO_COMPOSITION },
+  },
+  {
+    name: "__pnpm_install__",
+    note: "final pnpm install",
+    run: () => {
+      const result = spawnSync("pnpm", ["install"], {
+        cwd: REPO_ROOT,
+        stdio: "inherit",
+        shell: process.platform === "win32",
+      });
+      if (result.error) {
+        console.error("[demo] pnpm install failed:", result.error);
+        process.exit(1);
+      }
+      if (result.status !== 0) {
+        process.exit(result.status ?? 1);
+      }
+    },
   },
 ]);
 

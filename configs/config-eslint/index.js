@@ -19,20 +19,22 @@ const domainElementTypes = [
   "domain-other",
 ];
 
-/** Application orchestration / wiring slices infrastructure must not depend on. */
+/** Application orchestration */
 const applicationOrchestrationSlices = [
   "application-use-cases",
   "application-flows",
   "application-modules",
-  "application-ports",
-  "application-mappers",
 ];
 
-/** Application slices (specific paths before `application-other`). */
+/** Application orchestration + other logics (mapping) */
+const applicationLogicsSlices = [...applicationOrchestrationSlices, "application-mappers"];
+
+/** All Application slices (specific paths before `application-other`). */
 const applicationElementTypes = [
+  ...applicationLogicsSlices,
   "application-dtos",
+  "application-ports",
   "application-other",
-  ...applicationOrchestrationSlices,
 ];
 
 /** Infrastructure package kinds (specific before `infrastructure-other`). */
@@ -196,7 +198,7 @@ const config = defineConfig(
               from: { type: "infrastructure-driven-repository" },
               disallow: {
                 to: [
-                  ...applicationOrchestrationSlices.map((t) => ({ type: t })),
+                  ...applicationLogicsSlices.map((t) => ({ type: t })),
                   { type: "infrastructure-driven" },
                   { type: "infrastructure-driven-repository" },
                   { type: "apps" },
@@ -213,7 +215,7 @@ const config = defineConfig(
               from: { type: "infrastructure-driven" },
               disallow: {
                 to: [
-                  ...applicationOrchestrationSlices.map((t) => ({ type: t })),
+                  ...applicationLogicsSlices.map((t) => ({ type: t })),
                   { type: "infrastructure-driven" },
                   { type: "infrastructure-driven-repository" },
                   { type: "apps" },
@@ -231,7 +233,7 @@ const config = defineConfig(
               from: { type: "infrastructure-lib" },
               disallow: {
                 to: [
-                  ...applicationOrchestrationSlices.map((t) => ({ type: t })),
+                  ...applicationLogicsSlices.map((t) => ({ type: t })),
                   { type: "infrastructure-driven" },
                   { type: "infrastructure-driven-repository" },
                   { type: "apps" },
@@ -244,7 +246,7 @@ const config = defineConfig(
               from: { type: "infrastructure-other" },
               disallow: {
                 to: [
-                  ...applicationOrchestrationSlices.map((t) => ({ type: t })),
+                  ...applicationLogicsSlices.map((t) => ({ type: t })),
                   { type: "infrastructure-driven" },
                   { type: "infrastructure-driven-repository" },
                   { type: "apps" },
@@ -264,7 +266,7 @@ const config = defineConfig(
               disallow: {
                 to: [
                   ...domainElementTypes.map((type) => ({ type })),
-                  ...applicationOrchestrationSlices.map((type) => ({ type })),
+                  ...applicationElementTypes.map((type) => ({ type })),
                   ...infrastructureElementTypes.map((type) => ({ type })),
                 ],
               },
@@ -274,7 +276,7 @@ const config = defineConfig(
               disallow: {
                 to: [
                   ...domainElementTypes.map((type) => ({ type })),
-                  ...applicationOrchestrationSlices.map((type) => ({ type })),
+                  ...applicationElementTypes.map((type) => ({ type })),
                   { type: "application-other" },
                   ...infrastructureElementTypes.map((type) => ({ type })),
                   { type: "apps" },
@@ -282,30 +284,39 @@ const config = defineConfig(
                 ],
               },
             },
-            // Only composition may depend on `src/modules` (public `@application/*/modules` entry).
             {
               from: { type: "application-dtos" },
-              disallow: { to: [{ type: "application-modules" }] },
+              disallow: { to: [...applicationOrchestrationSlices.map((type) => ({ type }))] },
             },
             {
               from: { type: "application-use-cases" },
-              disallow: { to: [{ type: "application-modules" }] },
+              disallow: {
+                to: [...applicationOrchestrationSlices.map((type) => ({ type }))],
+              },
             },
             {
               from: { type: "application-flows" },
-              disallow: { to: [{ type: "application-modules" }] },
+              disallow: {
+                to: [...applicationOrchestrationSlices.map((type) => ({ type }))],
+              },
             },
             {
               from: { type: "application-ports" },
-              disallow: { to: [{ type: "application-modules" }] },
+              disallow: {
+                to: [...applicationOrchestrationSlices.map((type) => ({ type }))],
+              },
             },
             {
               from: { type: "application-mappers" },
-              disallow: { to: [{ type: "application-modules" }] },
+              disallow: {
+                to: [...applicationOrchestrationSlices.map((type) => ({ type }))],
+              },
             },
             {
               from: { type: "application-other" },
-              disallow: { to: [{ type: "application-modules" }] },
+              disallow: {
+                to: [...applicationOrchestrationSlices.map((type) => ({ type }))],
+              },
             },
           ],
         },
