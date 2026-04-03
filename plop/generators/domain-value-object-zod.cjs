@@ -17,7 +17,7 @@ module.exports = function registerDomainValueObjectZodGenerator(plop) {
         type: "list",
         name: "domainPackage",
         message: "Select domain package:",
-        choices: getDomainPackageChoices(repoRoot),
+        choices: getDomainPackageChoices(repoRoot, { excludeCore: false }),
       },
       {
         type: "input",

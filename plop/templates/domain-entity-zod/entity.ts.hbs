@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { {{pascalCase entityName}}Id } from '../value-objects/{{kebabCase entityName}}-id.vo';
 
 export const {{pascalCase entityName}}Schema = z.object({
-  // TODO: add fields (entity id is a separate value object, not in this schema)
+  // TODO: add fields (use `domain-entity-add-vo-field` for VO-backed props; entity id is separate)
 });
 
 export type {{pascalCase entityName}}DataProps = z.infer<

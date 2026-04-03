@@ -1,5 +1,6 @@
 const registerDomainPackageGenerator = require("./generators/domain-package.cjs");
 const registerDomainEntityZodGenerator = require("./generators/domain-entity-zod.cjs");
+const registerDomainEntityAddVoFieldGenerator = require("./generators/domain-entity-add-vo-field.cjs");
 const registerDomainValueObjectZodGenerator = require("./generators/domain-value-object-zod.cjs");
 const registerDomainErrorGenerator = require("./generators/domain-error.cjs");
 const registerDomainServiceGenerator = require("./generators/domain-service.cjs");
@@ -32,6 +33,7 @@ function registerGeneratorsForLayers(plop, includedLayers) {
   if (includedLayers.includes("Domain")) {
     registerDomainPackageGenerator(plop);
     registerDomainEntityZodGenerator(plop);
+    registerDomainEntityAddVoFieldGenerator(plop);
     registerDomainValueObjectZodGenerator(plop);
     registerDomainErrorGenerator(plop);
     registerDomainServiceGenerator(plop);

@@ -10,8 +10,9 @@
  * package (`src/index.ts`). No secondary Port + driven-port-adapter yet (empty "other" ports
  * break that generator until the port defines methods).
  *
- * After the Ticket entity, the demo also scaffolds one example VO per kind (single-value:
- * string / boolean / number / Date, plus one composite VO) under @domain/demo-support.
+ * After the Ticket entity, `domain-entity-add-vo-field` adds Slug (@domain/core). The demo scaffolds
+ * example VOs under @domain/demo-support (including DemoComposite as a standalone sample), then adds
+ * more Ticket fields: Email + Locale from core, DemoString + DemoBoolean from the same package.
  *
  * After `@application/demo-support` exists, `application-entity-to-dto-mapper` adds Ticket DTO +
  * `mapTicketToDTO` (+ test) under `src/dtos` and `src/mappers`.
@@ -83,6 +84,16 @@ const STEPS = /** @type {DemoStep[]} */ ([
     },
   },
   {
+    name: "domain-entity-add-vo-field",
+    note: "Ticket.slug from @domain/core (Slug)",
+    answers: {
+      domainPackage: DEMO_DOMAIN,
+      entityName: "Ticket",
+      propName: "slug",
+      voSelection: { voClass: "Slug", source: "core" },
+    },
+  },
+  {
     name: "domain-value-object-zod",
     note: "Example single-value VO (string) for docs / onboarding",
     answers: {
@@ -129,6 +140,46 @@ const STEPS = /** @type {DemoStep[]} */ ([
       domainPackage: DEMO_DOMAIN,
       valueObjectName: "DemoComposite",
       valueObjectKind: "composite",
+    },
+  },
+  {
+    name: "domain-entity-add-vo-field",
+    note: "Ticket.customerEmail (Email @domain/core)",
+    answers: {
+      domainPackage: DEMO_DOMAIN,
+      entityName: "Ticket",
+      propName: "customerEmail",
+      voSelection: { voClass: "Email", source: "core" },
+    },
+  },
+  {
+    name: "domain-entity-add-vo-field",
+    note: "Ticket.locale (Locale @domain/core)",
+    answers: {
+      domainPackage: DEMO_DOMAIN,
+      entityName: "Ticket",
+      propName: "locale",
+      voSelection: { voClass: "Locale", source: "core" },
+    },
+  },
+  {
+    name: "domain-entity-add-vo-field",
+    note: "Ticket.subject (DemoString)",
+    answers: {
+      domainPackage: DEMO_DOMAIN,
+      entityName: "Ticket",
+      propName: "subject",
+      voSelection: { voClass: "DemoString", source: "local" },
+    },
+  },
+  {
+    name: "domain-entity-add-vo-field",
+    note: "Ticket.isEscalated (DemoBoolean)",
+    answers: {
+      domainPackage: DEMO_DOMAIN,
+      entityName: "Ticket",
+      propName: "isEscalated",
+      voSelection: { voClass: "DemoBoolean", source: "local" },
     },
   },
   {
