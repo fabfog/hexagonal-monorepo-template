@@ -5,7 +5,7 @@ const path = require("path");
 
 /**
  * Graph: apps → composition → application → modules → use-cases / flows → domain entities & services
- * (path / import-string heuristics only, no metadata).
+ * → entity refs from each wired domain service file (path / import-string heuristics only, no metadata).
  */
 
 /** @typedef {"app" | "composition" | "application" | "module" | "useCase" | "flow" | "domainEntity" | "domainService"} NodeKind */
@@ -327,6 +327,123 @@ function extractDomainEntityAndServiceRefs(source, repoRoot, onRef) {
 }
 
 /**
+ * Entity imports relative to `packages/domain/<domainPkg>/src/services/*.service.ts` (e.g. `../entities`).
+ * @param {string} source
+ * @param {string} repoRoot
+ * @param {string} domainPkg
+ * @param {(domainPkg: string, className: string, label: string) => void} onEntityRef
+ */
+function extractRelativeDomainEntityRefs(source, repoRoot, domainPkg, onEntityRef) {
+  const cleaned = stripTsCommentsApprox(source);
+  const pkgPath = path.join(repoRoot, "packages", "domain", domainPkg, "package.json");
+  if (!fs.existsSync(pkgPath)) return;
+
+  const relBarrelRe = /import\s+(?:type\s+)?\{([^}]*)\}\s+from\s+["']\.\.\/entities["']\s*;/g;
+  let m;
+  while ((m = relBarrelRe.exec(cleaned)) !== null) {
+    for (const id of parseNamedImportIdentifiers(m[1])) {
+      const kebab = resolveEntityKebab(repoRoot, domainPkg, id);
+      if (kebab) onEntityRef(domainPkg, id, `@domain/${domainPkg}/entities\n${id}`);
+    }
+  }
+
+  const relSubRe =
+    /import\s+(?:type\s+)?\{([^}]*)\}\s+from\s+["']\.\.\/entities\/([a-z0-9-]+)(?:\.entity)?["']\s*;/g;
+  while ((m = relSubRe.exec(cleaned)) !== null) {
+    const stem = m[2];
+    const abs = path.join(
+      repoRoot,
+      "packages",
+      "domain",
+      domainPkg,
+      "src",
+      "entities",
+      `${stem}.entity.ts`
+    );
+    if (fs.existsSync(abs)) {
+      const ids = parseNamedImportIdentifiers(m[1]);
+      const className =
+        ids[0] || readExportedDomainClassName(abs) || `${kebabStemToPascal(stem)}Entity`;
+      onEntityRef(domainPkg, className, `@domain/${domainPkg}/entities → ${className}`);
+    }
+  }
+
+  const relDefaultRe =
+    /import\s+(?:type\s+)?(\w+)\s+from\s+["']\.\.\/entities\/([a-z0-9-]+)(?:\.entity)?["']\s*;/g;
+  while ((m = relDefaultRe.exec(cleaned)) !== null) {
+    const stem = m[2];
+    const abs = path.join(
+      repoRoot,
+      "packages",
+      "domain",
+      domainPkg,
+      "src",
+      "entities",
+      `${stem}.entity.ts`
+    );
+    if (fs.existsSync(abs)) {
+      const localName = m[1];
+      const className = readExportedDomainClassName(abs) || localName;
+      onEntityRef(domainPkg, className, `@domain/${domainPkg}/entities → ${className}`);
+    }
+  }
+}
+
+/**
+ * @param {string} repoRoot
+ * @param {string} domainPkg
+ * @param {string} className
+ * @returns {string | null} absolute path to .service.ts
+ */
+function resolveDomainServiceAbsPath(repoRoot, domainPkg, className) {
+  const kebab = resolveServiceKebab(repoRoot, domainPkg, className);
+  if (!kebab) return null;
+  const abs = path.join(
+    repoRoot,
+    "packages",
+    "domain",
+    domainPkg,
+    "src",
+    "services",
+    `${kebab}.service.ts`
+  );
+  return fs.existsSync(abs) ? abs : null;
+}
+
+/**
+ * Edges domainService → domainEntity from a wired service’s imports (@domain/… and ../entities).
+ * @param {string} repoRoot
+ * @param {string} serviceNodeId
+ * @param {string} domainPkg
+ * @param {string} className
+ * @param {(id: string, kind: NodeKind, label: string) => void} addNode
+ * @param {WiringEdge[]} edges
+ */
+function wireDomainServiceToDomainEntities(
+  repoRoot,
+  serviceNodeId,
+  domainPkg,
+  className,
+  addNode,
+  edges
+) {
+  const absPath = resolveDomainServiceAbsPath(repoRoot, domainPkg, className);
+  if (!absPath) return;
+  const text = fs.readFileSync(absPath, "utf8");
+
+  function pushEntity(dpkg, cname, label) {
+    const nid = `de_${mermaidSafeId(dpkg)}_${mermaidSafeId(cname)}`;
+    addNode(nid, "domainEntity", label);
+    edges.push({ from: serviceNodeId, to: nid });
+  }
+
+  extractDomainEntityAndServiceRefs(text, repoRoot, (kind, dpkg, cname, label) => {
+    if (kind === "domainEntity") pushEntity(dpkg, cname, label);
+  });
+  extractRelativeDomainEntityRefs(text, repoRoot, domainPkg, pushEntity);
+}
+
+/**
  * @param {string} moduleFileContent
  * @returns {{ useCases: string[], flows: string[] }}
  */
@@ -376,8 +493,16 @@ function mermaidSafeId(s) {
  * @param {string} consumerId
  * @param {(id: string, kind: NodeKind, label: string) => void} addNode
  * @param {WiringEdge[]} edges
+ * @param {Map<string, { domainPkg: string, className: string }> | null} [domainServiceRegistry]
  */
-function wireConsumerToDomain(repoRoot, absPath, consumerId, addNode, edges) {
+function wireConsumerToDomain(
+  repoRoot,
+  absPath,
+  consumerId,
+  addNode,
+  edges,
+  domainServiceRegistry
+) {
   if (!fs.existsSync(absPath)) return;
   const text = fs.readFileSync(absPath, "utf8");
   extractDomainEntityAndServiceRefs(text, repoRoot, (kind, domainPkg, className, label) => {
@@ -385,6 +510,9 @@ function wireConsumerToDomain(repoRoot, absPath, consumerId, addNode, edges) {
     const nid = `${prefix}_${mermaidSafeId(domainPkg)}_${mermaidSafeId(className)}`;
     addNode(nid, kind, label);
     edges.push({ from: consumerId, to: nid });
+    if (kind === "domainService" && domainServiceRegistry) {
+      domainServiceRegistry.set(nid, { domainPkg, className });
+    }
   });
 }
 
@@ -451,6 +579,9 @@ function buildCompositionWiringGraph(repoRoot) {
 
   const compositionFolderNames = new Set(compDirs);
 
+  /** @type {Map<string, { domainPkg: string, className: string }>} */
+  const domainServiceRegistry = new Map();
+
   for (const compName of compDirs) {
     const cid = `c_${mermaidSafeId(compName)}`;
     addNode(cid, "composition", `@composition/${compName}`);
@@ -503,7 +634,7 @@ function buildCompositionWiringGraph(repoRoot) {
           const uid = `uc_${mermaidSafeId(appName)}_${mermaidSafeId(uc)}`;
           addNode(uid, "useCase", `${uc}.use-case`);
           edges.push({ from: mid, to: uid });
-          wireConsumerToDomain(repoRoot, ucPath, uid, addNode, edges);
+          wireConsumerToDomain(repoRoot, ucPath, uid, addNode, edges, domainServiceRegistry);
         }
         for (const fl of flows) {
           const flPath = path.join(
@@ -519,10 +650,14 @@ function buildCompositionWiringGraph(repoRoot) {
           const fid = `fl_${mermaidSafeId(appName)}_${mermaidSafeId(fl)}`;
           addNode(fid, "flow", `${fl}.flow`);
           edges.push({ from: mid, to: fid });
-          wireConsumerToDomain(repoRoot, flPath, fid, addNode, edges);
+          wireConsumerToDomain(repoRoot, flPath, fid, addNode, edges, domainServiceRegistry);
         }
       }
     }
+  }
+
+  for (const [serviceId, { domainPkg, className }] of domainServiceRegistry) {
+    wireDomainServiceToDomainEntities(repoRoot, serviceId, domainPkg, className, addNode, edges);
   }
 
   appendAppToCompositionEdges(repoRoot, nodes, edges, addNode, compositionFolderNames);
@@ -581,7 +716,7 @@ function wiringMermaidToHtml(mermaidSource) {
 </head>
 <body>
   <h1>Composition wiring (apps, application, domain)</h1>
-  <p class="hint">Derived from file paths and import strings only (no extra metadata). <strong>Apps</strong>: <code>apps/&lt;name&gt;/src/**/*.{ts,tsx}</code> referencing <code>@composition/&lt;pkg&gt;</code> (existing composition packages only). <strong>Composition → application</strong>: scan composition <code>src</code> for <code>@application/&lt;pkg&gt;/…</code>. <strong>Modules</strong> and <strong>use-case / flow</strong> wiring unchanged. <strong>Domain</strong>: from each <code>*.use-case.ts</code> and <code>*.flow.ts</code>, parse <code>@domain/&lt;pkg&gt;/entities</code> and <code>…/services</code> (barrel or subpath); edges only if the matching <code>.entity.ts</code> / <code>.service.ts</code> exists. <strong>Domain nodes</strong> are labeled with the <strong>PascalCase</strong> class name (import symbol for barrels; first <code>export class</code> in the slice file for subpath, with a kebab→Pascal fallback if needed).</p>
+  <p class="hint">Derived from file paths and import strings only (no extra metadata). <strong>Apps</strong>: <code>apps/&lt;name&gt;/src/**/*.{ts,tsx}</code> referencing <code>@composition/&lt;pkg&gt;</code> (existing composition packages only). <strong>Composition → application</strong>: scan composition <code>src</code> for <code>@application/&lt;pkg&gt;/…</code>. <strong>Modules</strong> and <strong>use-case / flow</strong> wiring unchanged. <strong>Domain</strong>: from each <code>*.use-case.ts</code> and <code>*.flow.ts</code>, parse <code>@domain/&lt;pkg&gt;/entities</code> and <code>…/services</code> (barrel or subpath); edges only if the matching <code>.entity.ts</code> / <code>.service.ts</code> exists. <strong>Domain service → entity</strong>: for each domain service reached from a use-case/flow, parse the same <code>@domain/…/entities</code> patterns plus <code>../entities</code> relatives from that <code>.service.ts</code>. <strong>Domain nodes</strong> are labeled with the <strong>PascalCase</strong> class name (import symbol for barrels; first <code>export class</code> in the slice file for subpath, with a kebab→Pascal fallback if needed).</p>
   <pre class="mermaid">${safe}</pre>
 </body>
 </html>`;
@@ -601,4 +736,7 @@ module.exports = {
   pascalToKebab,
   resolveEntityKebab,
   resolveServiceKebab,
+  resolveDomainServiceAbsPath,
+  wireDomainServiceToDomainEntities,
+  extractRelativeDomainEntityRefs,
 };
