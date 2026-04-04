@@ -13,8 +13,22 @@ const {
 const { getApplicationPackageBaseActions } = require("./application-package.cjs");
 const { ensureApplicationPackageSlice } = require("../lib/ensure-package-slice.cjs");
 const { generateApplicationEntityMapperSources } = require("../lib/entity-to-dto-map-codegen.cjs");
+const { runPnpmInstallWithConsentOrThrow } = require("../lib/pnpm-install.cjs");
 
 const repoRoot = getRepoRoot();
+
+/**
+ * @param {unknown} err
+ */
+function isMapperCodegenUnresolvedDepsError(err) {
+  const msg = err instanceof Error ? err.message : String(err);
+  return (
+    (msg.includes("Could not infer properties") &&
+      msg.includes("toSnapshot()") &&
+      msg.includes("any")) ||
+    (msg.includes("pnpm install") && msg.includes("workspace"))
+  );
+}
 
 function getPackageNameChoices() {
   return toPlopChoices(getDomainPackageNamesOrThrow(repoRoot));
@@ -24,7 +38,7 @@ function getPackageNameChoices() {
 module.exports = function registerApplicationEntityToDtoMapperGenerator(plop) {
   plop.setGenerator("application-entity-to-dto-mapper", {
     description:
-      "Add DTO + mapper for an existing Domain Entity into the corresponding @application/* package",
+      "Add DTO + mapper for an existing Domain Entity into the corresponding @application/* package (if TypeScript cannot resolve deps, re-run with: pnpm plop application-entity-to-dto-mapper -- --confirm-install)",
     prompts: [
       {
         type: "list",
@@ -125,13 +139,6 @@ module.exports = function registerApplicationEntityToDtoMapperGenerator(plop) {
       });
 
       actions.push(() => {
-        const { dtoSource, mapperSource, testSource } = generateApplicationEntityMapperSources({
-          repoRoot,
-          domainPackage: domainPackageName,
-          entityBasePascal: entityName,
-          applicationPackage,
-        });
-
         const dtosDir = packagePath(repoRoot, "application", applicationPackage, "src", "dtos");
         const mappersDir = packagePath(
           repoRoot,
@@ -156,9 +163,29 @@ module.exports = function registerApplicationEntityToDtoMapperGenerator(plop) {
           }
         }
 
-        fs.writeFileSync(dtoFile, dtoSource);
-        fs.writeFileSync(mapperFile, mapperSource);
-        fs.writeFileSync(testFile, testSource);
+        const runCodegen = () =>
+          generateApplicationEntityMapperSources({
+            repoRoot,
+            domainPackage: domainPackageName,
+            entityBasePascal: entityName,
+            applicationPackage,
+          });
+
+        /** @type {{ dtoSource: string, mapperSource: string, testSource: string }} */
+        let bundle;
+        try {
+          bundle = runCodegen();
+        } catch (e) {
+          if (!isMapperCodegenUnresolvedDepsError(e)) throw e;
+          runPnpmInstallWithConsentOrThrow(repoRoot, {
+            context: e instanceof Error ? e.message : String(e),
+          });
+          bundle = runCodegen();
+        }
+
+        fs.writeFileSync(dtoFile, bundle.dtoSource);
+        fs.writeFileSync(mapperFile, bundle.mapperSource);
+        fs.writeFileSync(testFile, bundle.testSource);
       });
 
       // Update dtos barrel

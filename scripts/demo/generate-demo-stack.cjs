@@ -3,7 +3,7 @@
  * Non-interactive demo scaffold: runs Plop generators in a fixed order with
  * predetermined answers. Safe to re-read as a checklist of "user prompts".
  *
- * Usage: node scripts/demo/generate-demo-stack.cjs
+ * Usage: node scripts/demo/generate-demo-stack.cjs [--confirm-install] [--force]
  * Env:   PLOP_LAYER=All (set automatically) so the plopfile registers every generator.
  *
  * v1 is intentionally minimal: support-style Ticket + repository adapter + one composition
@@ -23,13 +23,18 @@
  * `src/modules/`: `application-module` wires `GetTicketById` + that flow, then `application-wire-module`
  * adds `UpdateTicket`.
  * Then `composition-wire-module` wires `SupportInboxModule` into `@composition/demo-web` `getDemoWebModules`.
+ *
+ * Install steps: `pnpm install` runs only with consent — pass `--confirm-install`, `--force`, or set
+ * `DEMO_CONFIRM_INSTALL=1`. The `pnpm demo:generate` script includes `--confirm-install`.
  */
 
 const fs = require("fs");
 const path = require("path");
-const { spawnSync } = require("child_process");
 const { toKebabCase, toCamelCase } = require(
   path.join(__dirname, "..", "..", "plop", "lib", "casing.cjs")
+);
+const { runPnpmInstall } = require(
+  path.join(__dirname, "..", "..", "plop", "lib", "pnpm-install.cjs")
 );
 
 const {
@@ -54,6 +59,29 @@ const DEMO_MODULE_FILE = `${toKebabCase(DEMO_MODULE_NAME)}.module.ts`;
 /** Property key in composition `get*Modules` return object (`supportInbox` for `SupportInbox`). */
 const DEMO_MODULE_PROPERTY_KEY = toCamelCase(DEMO_MODULE_NAME);
 const MARKER = getDemoMarkerPath(REPO_ROOT);
+
+function hasDemoPnpmInstallConsent() {
+  return (
+    process.argv.includes("--confirm-install") ||
+    process.argv.includes("--force") ||
+    process.env.DEMO_CONFIRM_INSTALL === "1"
+  );
+}
+
+/**
+ * @param {string} stepNote
+ */
+function runDemoPnpmInstall(stepNote) {
+  if (!hasDemoPnpmInstallConsent()) {
+    console.error(
+      `[demo] Refusing to run pnpm install (${stepNote}).\n` +
+        "Use: pnpm demo:generate (adds --confirm-install), or pass --confirm-install / --force, " +
+        "or set DEMO_CONFIRM_INSTALL=1, or run pnpm install yourself and skip these steps.\n"
+    );
+    process.exit(1);
+  }
+  runPnpmInstall(REPO_ROOT);
+}
 
 function assertCleanOrForce() {
   const force = process.argv.includes("--force");
@@ -212,17 +240,11 @@ const STEPS = /** @type {DemoStep[]} */ ([
     name: "__pnpm_install__",
     note: "intermediate pnpm install (so TypeScript can resolve zod + @domain/* for DTO/mapper codegen)",
     run: () => {
-      const result = spawnSync("pnpm", ["install"], {
-        cwd: REPO_ROOT,
-        stdio: "inherit",
-        shell: process.platform === "win32",
-      });
-      if (result.error) {
-        console.error("[demo] pnpm install failed:", result.error);
+      try {
+        runDemoPnpmInstall("before application-entity-to-dto-mapper");
+      } catch (e) {
+        console.error("[demo] pnpm install failed:", e);
         process.exit(1);
-      }
-      if (result.status !== 0) {
-        process.exit(result.status ?? 1);
       }
     },
   },
@@ -350,17 +372,11 @@ const STEPS = /** @type {DemoStep[]} */ ([
     name: "__pnpm_install__",
     note: "final pnpm install",
     run: () => {
-      const result = spawnSync("pnpm", ["install"], {
-        cwd: REPO_ROOT,
-        stdio: "inherit",
-        shell: process.platform === "win32",
-      });
-      if (result.error) {
-        console.error("[demo] pnpm install failed:", result.error);
+      try {
+        runDemoPnpmInstall("after composition wiring");
+      } catch (e) {
+        console.error("[demo] pnpm install failed:", e);
         process.exit(1);
-      }
-      if (result.status !== 0) {
-        process.exit(result.status ?? 1);
       }
     },
   },

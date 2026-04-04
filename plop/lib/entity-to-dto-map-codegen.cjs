@@ -839,7 +839,8 @@ function generateApplicationEntityMapperSources(opts) {
   if (props.length === 0 && returnTypeLabel === "any") {
     throw new Error(
       `Could not infer properties from ${entityClassName}.toSnapshot() (return type is any). ` +
-        "Run `pnpm install` at the repo root so dependencies like zod and workspace @domain/* resolve, then re-run this generator."
+        "Run `pnpm install` at the repo root so dependencies like zod and workspace @domain/* resolve, then re-run this generator. " +
+        "From Plop you can re-run with: pnpm plop application-entity-to-dto-mapper -- --confirm-install"
     );
   }
 
