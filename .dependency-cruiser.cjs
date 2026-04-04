@@ -4,6 +4,7 @@
  * Goals (template):
  * - detect circular dependencies
  * - forbid cross-context imports between domain/app packages
+ * - flag package TS with zero importers in the cruised graph (under packages/)
  * - keep severity configurable (default: "warn")
  */
 
@@ -89,6 +90,23 @@ module.exports = {
       to: {
         path: "^packages/domain/.+",
         pathNot: ["^packages/domain/core/.+", "^packages/domain/$1/.+"],
+      },
+    },
+
+    // ---- unused within cruised graph (packages/ only) ----
+    // Violation: module has fewer than 1 dependent among cruised modules (nothing imports it).
+    // Excludes tests, .d.ts, and composition package entries (usually imported only from apps/).
+    {
+      name: "packages-no-importers",
+      comment:
+        "No other file under packages/ imports this module (static graph). Excludes tests, typings, composition bootstrap, per-folder barrels (often reached only via package exports from apps), and composition-only type shims (type-only imports may not count as dependents).",
+      severity: VIOLATION_SEVERITY,
+      from: {},
+      module: {
+        path: "^packages/.+\\.(tsx|ts)$",
+        pathNot:
+          "\\.(test|spec)\\.(tsx|ts)$|\\.d\\.ts$|^packages/composition/[^/]+/src/index\\.(tsx|ts)$|^packages/composition/[^/]+/src/types\\.(tsx|ts)$|/src/[^/]+/index\\.(tsx|ts)$",
+        numberOfDependentsLessThan: 1,
       },
     },
   ],

@@ -14,7 +14,7 @@
  * example VOs under @domain/demo-support (including DemoComposite as a standalone sample), then adds
  * more Ticket fields: Email + Locale from core, DemoString + DemoBoolean from the same package.
  *
- * A second entity (`SupportQueueEntity`) and `domain-service` (`TicketRoutingService`) import both `Ticket` and `SupportQueue` entity types.
+ * A second entity (`TicketCommentEntity`) and `domain-service` (`TicketDemoService`) import both `Ticket` and `TicketComment` entity types.
  *
  * After `@application/demo-support` exists, `application-entity-to-dto-mapper` adds Ticket DTO +
  * `mapTicketToDTO` (+ test) under `src/dtos` and `src/mappers`.
