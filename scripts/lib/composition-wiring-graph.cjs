@@ -34,6 +34,33 @@ const KIND_COLORS = {
 };
 
 /**
+ * vis-network hierarchical levels: app → composition → application → module → use-case/flow → domain (service then entity).
+ * @param {NodeKind} kind
+ * @returns {number}
+ */
+function hierarchicalLevelForKind(kind) {
+  switch (kind) {
+    case "app":
+      return 0;
+    case "composition":
+      return 1;
+    case "application":
+      return 2;
+    case "module":
+      return 3;
+    case "useCase":
+    case "flow":
+      return 4;
+    case "domainService":
+      return 5;
+    case "domainEntity":
+      return 6;
+    default:
+      return 0;
+  }
+}
+
+/**
  * @param {string} dir
  * @param {string[]} [extensions]
  * @returns {string[]}
@@ -695,19 +722,24 @@ function toWiringMermaid(nodes, edges) {
  * Portable graph snapshot (e.g. for vis-network, Cytoscape, or other tools).
  * @param {Map<string, WiringNode>} nodes
  * @param {WiringEdge[]} edges
- * @returns {{ nodes: Array<{ id: string, label: string, kind: NodeKind }>, edges: Array<{ from: string, to: string }> }}
+ * @returns {{ nodes: Array<{ id: string, label: string, kind: NodeKind, level: number }>, edges: Array<{ from: string, to: string }> }}
  */
 function toWiringGraphJson(nodes, edges) {
   const nodeList = [...nodes.values()]
     .sort((a, b) => a.id.localeCompare(b.id))
-    .map((n) => ({ id: n.id, label: n.label, kind: n.kind }));
+    .map((n) => ({
+      id: n.id,
+      label: n.label,
+      kind: n.kind,
+      level: hierarchicalLevelForKind(n.kind),
+    }));
   const edgeList = edges.map((e) => ({ from: e.from, to: e.to }));
   return { nodes: nodeList, edges: edgeList };
 }
 
 /**
  * Self-contained HTML: vis-network + embedded JSON (works from file://).
- * @param {{ nodes: Array<{ id: string, label: string, kind: NodeKind }>, edges: Array<{ from: string, to: string }> }} payload
+ * @param {{ nodes: Array<{ id: string, label: string, kind: NodeKind, level?: number }>, edges: Array<{ from: string, to: string }> }} payload
  * @returns {string}
  */
 function wiringInteractiveVisHtml(payload) {
@@ -744,11 +776,12 @@ function wiringInteractiveVisHtml(payload) {
 <body>
   <header>
     <h1>Composition wiring — interactive (vis-network)</h1>
-    <p class="hint">Drag nodes, scroll to zoom, drag background to pan. Physics stops after layout so positions stay put. Same data as <code>composition-wiring.json</code>.</p>
+    <p class="hint">Hierarchical layout: app → composition → application → module → use-case/flow → domain (service, then entity). Toggle top–bottom vs left–right. Drag the canvas to pan, scroll to zoom. Same data as <code>composition-wiring.json</code>.</p>
   </header>
   <div class="toolbar">
     <button type="button" id="btn-fit">Fit view</button>
-    <button type="button" id="btn-physics">Toggle physics</button>
+    <button type="button" id="btn-tb">Top → bottom</button>
+    <button type="button" id="btn-lr">Left → right</button>
   </div>
   <div id="graph"></div>
   <script>
@@ -773,56 +806,106 @@ function wiringInteractiveVisHtml(payload) {
         visNodes = new vis.DataSet(
           payload.nodes.map(function (n) {
             var bg = KIND_COLORS[n.kind] || "#eceff1";
+            var level =
+              typeof n.level === "number"
+                ? n.level
+                : ({ app: 0, composition: 1, application: 2, module: 3, useCase: 4, flow: 4, domainService: 5, domainEntity: 6 }[
+                    n.kind
+                  ] ?? 0);
             return {
               id: n.id,
               label: n.label,
+              level: level,
               color: { background: bg, border: "#37474f", highlight: { background: bg, border: "#111" } },
               shape: "box",
               margin: 12,
               font: { color: "#111111", multi: true, size: 13 },
+              widthConstraint: { maximum: 260 },
             };
           })
         );
         visEdges = new vis.DataSet(
           payload.edges.map(function (e, i) {
-            return { id: "e" + i, from: e.from, to: e.to, arrows: "to", smooth: { type: "dynamic" } };
+            return { id: "e" + i, from: e.from, to: e.to, arrows: "to" };
           })
         );
       }
       var container = document.getElementById("graph");
-      var physicsOn = true;
-      var options = {
-        nodes: { borderWidth: 1, shadow: false },
-        edges: { color: { color: "#78909c", highlight: "#37474f" } },
-        physics: {
-          enabled: true,
-          solver: "forceAtlas2Based",
-          forceAtlas2Based: {
-            gravitationalConstant: -60,
-            centralGravity: 0.008,
-            springLength: 160,
-            springConstant: 0.04,
+      /**
+       * LR: levelSeparation = horizontal gap between columns; nodeSpacing = vertical gap between siblings.
+       * UD: levelSeparation = vertical gap between ranks; nodeSpacing = horizontal gap on the same rank (raise if nodes overlap).
+       * Node widthConstraint + font.multi limits box width so ranks stay predictable.
+       */
+      function hierarchicalOptions(direction) {
+        var isLR = direction === "LR" || direction === "RL";
+        return {
+          layout: {
+            hierarchical: {
+              enabled: true,
+              direction: direction,
+              sortMethod: "directed",
+              nodeSpacing: isLR ? 165 : 210,
+              levelSeparation: isLR ? 270 : 105,
+              treeSpacing: isLR ? 230 : 150,
+              blockShifting: true,
+              edgeMinimization: true,
+              parentCentralization: true,
+              shakeTowards: "roots",
+            },
           },
-          stabilization: { iterations: 400, updateInterval: 25 },
-        },
+          physics: false,
+          edges: {
+            color: { color: "#78909c", highlight: "#37474f" },
+            smooth: {
+              type: "cubicBezier",
+              roundness: 0.35,
+              forceDirection: isLR ? "horizontal" : "vertical",
+            },
+          },
+        };
+      }
+      var options = {
+        nodes: { borderWidth: 1, shadow: false, widthConstraint: { maximum: 260 } },
         interaction: { dragNodes: true, dragView: true, zoomView: true, multiselect: false },
       };
-      var network = new vis.Network(container, { nodes: visNodes, edges: visEdges }, options);
-      if (!payload.nodes.length) {
-        network.setOptions({ physics: false });
-        physicsOn = false;
+      if (payload.nodes.length) {
+        Object.assign(options, hierarchicalOptions("UD"));
       } else {
-        network.once("stabilizationIterationsDone", function () {
-          network.setOptions({ physics: false });
-          physicsOn = false;
+        options.physics = false;
+      }
+      var network = new vis.Network(container, { nodes: visNodes, edges: visEdges }, options);
+      function fitAfterLayout(animate) {
+        var called = false;
+        function once() {
+          if (called) return;
+          called = true;
+          network.fit({
+            animation: animate
+              ? { duration: 220, easingFunction: "easeInOutQuad" }
+              : false,
+          });
+        }
+        network.once("stabilizationEnd", once);
+        setTimeout(once, 400);
+      }
+      function setDirection(dir) {
+        network.setOptions(hierarchicalOptions(dir));
+        fitAfterLayout(false);
+      }
+      if (payload.nodes.length) {
+        fitAfterLayout(true);
+        document.getElementById("btn-tb").addEventListener("click", function () {
+          setDirection("UD");
         });
+        document.getElementById("btn-lr").addEventListener("click", function () {
+          setDirection("LR");
+        });
+      } else {
+        document.getElementById("btn-tb").disabled = true;
+        document.getElementById("btn-lr").disabled = true;
       }
       document.getElementById("btn-fit").addEventListener("click", function () {
         network.fit({ animation: { duration: 280, easingFunction: "easeInOutQuad" } });
-      });
-      document.getElementById("btn-physics").addEventListener("click", function () {
-        physicsOn = !physicsOn;
-        network.setOptions({ physics: { enabled: physicsOn } });
       });
     })();
   </script>
@@ -867,6 +950,7 @@ module.exports = {
   toWiringGraphJson,
   wiringMermaidToHtml,
   wiringInteractiveVisHtml,
+  hierarchicalLevelForKind,
   KIND_COLORS,
   walkTsFiles,
   extractApplicationPackageNames,
