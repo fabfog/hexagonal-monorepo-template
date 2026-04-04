@@ -14,6 +14,8 @@
  * example VOs under @domain/demo-support (including DemoComposite as a standalone sample), then adds
  * more Ticket fields: Email + Locale from core, DemoString + DemoBoolean from the same package.
  *
+ * A second entity (`SupportQueueEntity`) and `domain-service` (`TicketRoutingService`) import both `Ticket` and `SupportQueue` entity types.
+ *
  * After `@application/demo-support` exists, `application-entity-to-dto-mapper` adds Ticket DTO +
  * `mapTicketToDTO` (+ test) under `src/dtos` and `src/mappers`.
  *
@@ -35,11 +37,13 @@ const {
   DEMO_COMPOSITION,
   DEMO_DOMAIN,
   DEMO_ENTITY,
+  DEMO_DOMAIN_SECOND_ENTITY,
   DEMO_DRIVEN_REPO,
   DEMO_MODULE_NAME,
   GET_USE_CASE_NAME,
   UPDATE_USE_CASE_NAME,
   DEMO_FLOW_NAME,
+  DEMO_DOMAIN_SERVICE,
   getDemoMarkerPath,
   repoRootFromScriptsDemo,
 } = require("./demo-stack-config.cjs");
@@ -184,6 +188,24 @@ const STEPS = /** @type {DemoStep[]} */ ([
       entityName: "Ticket",
       propName: "isEscalated",
       voSelection: { voClass: "DemoBoolean", source: "local" },
+    },
+  },
+  {
+    name: "domain-entity",
+    note: `${DEMO_DOMAIN_SECOND_ENTITY} + ${DEMO_DOMAIN_SECOND_ENTITY}Id VO + not-found error`,
+    answers: {
+      domainPackage: DEMO_DOMAIN,
+      entityName: DEMO_DOMAIN_SECOND_ENTITY,
+      addNotFoundError: true,
+    },
+  },
+  {
+    name: "domain-service",
+    note: `${DEMO_DOMAIN_SERVICE}Service (imports Ticket + ${DEMO_DOMAIN_SECOND_ENTITY} entities)`,
+    answers: {
+      domainPackage: DEMO_DOMAIN,
+      selectedEntities: ["Ticket", DEMO_DOMAIN_SECOND_ENTITY],
+      serviceName: DEMO_DOMAIN_SERVICE,
     },
   },
   {
