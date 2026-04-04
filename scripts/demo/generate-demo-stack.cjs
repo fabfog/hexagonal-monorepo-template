@@ -23,6 +23,8 @@
  * `src/modules/`: `application-module` wires `GetTicketById` + that flow, then `application-wire-module`
  * adds `UpdateTicket`.
  * Then `composition-wire-module` wires `SupportInboxModule` into `@composition/demo-web` `getDemoWebModules`.
+ * Then `composition-wire-port-adapter` wires `TicketRepository` into `demo-web` `infrastructure.ts` as
+ * request-scoped `ticketRepository` (FIXME stub + `new TicketRepository()` until real constructor deps are passed).
  *
  * Install steps: `pnpm install` runs only with consent — pass `--confirm-install`, `--force`, or set
  * `DEMO_CONFIRM_INSTALL=1`. The `pnpm demo:generate` script includes `--confirm-install`.
@@ -369,6 +371,18 @@ const STEPS = /** @type {DemoStep[]} */ ([
     },
   },
   {
+    name: "composition-wire-port-adapter",
+    note: `Wire TicketRepository → ticketRepository (request-scoped) in @composition/${DEMO_COMPOSITION} infrastructure`,
+    answers: {
+      compositionPackage: DEMO_COMPOSITION,
+      infrastructurePackage: DEMO_DRIVEN_REPO,
+      implementationChoice:
+        "TicketRepository\trepositories/ticket.repository.ts\tTicketRepositoryPort",
+      propName: "ticketRepository",
+      scope: "request",
+    },
+  },
+  {
     name: "__pnpm_install__",
     note: "final pnpm install",
     run: () => {
@@ -421,7 +435,9 @@ async function main() {
   }
 
   console.log(
-    "\n[demo] Done. Next: implement `getForContext` in composition infrastructure so it satisfies module Infra types, then hook apps to `@composition/" +
+    "\n[demo] Done. Next: replace the `composition-wire-port-adapter` stub in `packages/composition/" +
+      DEMO_COMPOSITION +
+      "/src/infrastructure.ts` (pass real `TicketRepository` constructor deps from `RequestContext` / app-scoped clients), then hook apps to `@composition/" +
       DEMO_COMPOSITION +
       "`."
   );

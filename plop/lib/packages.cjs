@@ -124,6 +124,21 @@ function getInfrastructurePackageChoices(repoRoot) {
   return toPlopChoices(listChildDirectoryNames(root));
 }
 
+/**
+ * Infrastructure folders that export at least one class implementing a *Port / *InteractionPort.
+ * @param {string} repoRoot
+ * @returns {{ name: string, value: string }[]}
+ */
+function getInfrastructurePackagesWithPortImplementationsChoices(repoRoot) {
+  const { scanPortImplementations } = require("./scan-infrastructure-port-implementations.cjs");
+  const root = layerRoot(repoRoot, "infrastructure");
+  const folders = listChildDirectoryNames(root);
+  const withAdapters = folders.filter(
+    (folder) => scanPortImplementations(repoRoot, folder).length > 0
+  );
+  return toPlopChoices(withAdapters);
+}
+
 /** driven-* packages only */
 function getDrivenInfrastructurePackageChoices(repoRoot) {
   const root = layerRoot(repoRoot, "infrastructure");
@@ -566,6 +581,7 @@ module.exports = {
   getDomainPackageNamesOrThrow,
   getCompositionPackageChoices,
   getInfrastructurePackageChoices,
+  getInfrastructurePackagesWithPortImplementationsChoices,
   getDrivenInfrastructurePackageChoices,
   getDrivenRepositoryInfrastructurePackageChoices,
   readUtf8File,
