@@ -759,10 +759,9 @@ function wiringInteractiveVisHtml(payload) {
     header { padding: 0.75rem 1rem; background: #fff; border-bottom: 1px solid #e0e0e0; }
     h1 { font-size: 1rem; margin: 0 0 0.35rem; }
     .hint { font-size: 0.8rem; color: #546e7a; max-width: 48rem; line-height: 1.4; margin: 0; }
-    #graph { width: 100%; height: calc(100vh - 5.5rem); background: #fafafa; }
-    .toolbar { padding: 0.35rem 1rem; background: #eee; font-size: 0.8rem; color: #455a64; }
+    #graph { width: 100%; height: calc(100vh - 6.5rem); background: #fafafa; }
+    .toolbar { padding: 0.35rem 1rem; background: #eee; font-size: 0.8rem; color: #455a64; display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem 0.75rem; }
     .toolbar button {
-      margin-right: 0.5rem;
       padding: 0.25rem 0.6rem;
       font-size: 0.8rem;
       cursor: pointer;
@@ -771,17 +770,34 @@ function wiringInteractiveVisHtml(payload) {
       background: #fff;
     }
     .toolbar button:hover { background: #eceff1; }
+    .toolbar-group { display: inline-flex; align-items: center; gap: 0.25rem; flex-wrap: wrap; }
+    .toolbar-group .tb-label { color: #546e7a; white-space: nowrap; }
+    .toolbar-group .tb-val { min-width: 2.25rem; text-align: center; font-variant-numeric: tabular-nums; color: #263238; }
+    .toolbar-sep { color: #b0bec5; user-select: none; }
   </style>
 </head>
 <body>
   <header>
     <h1>Composition wiring — interactive (vis-network)</h1>
-    <p class="hint">Hierarchical layout: app → composition → application → module → use-case/flow → domain (service, then entity). Toggle top–bottom vs left–right. Drag the canvas to pan, scroll to zoom. Same data as <code>composition-wiring.json</code>.</p>
+    <p class="hint">Hierarchical layout: app → composition → application → module → use-case/flow → domain (service, then entity). Toggle top–bottom vs left–right; <strong>Level gap</strong> / <strong>Sibling gap</strong> ± adjust spacing (separate presets per orientation). Pan and zoom on the canvas. Same data as <code>composition-wiring.json</code>.</p>
   </header>
   <div class="toolbar">
     <button type="button" id="btn-fit">Fit view</button>
     <button type="button" id="btn-tb">Top → bottom</button>
     <button type="button" id="btn-lr">Left → right</button>
+    <span class="toolbar-sep" aria-hidden="true">|</span>
+    <span class="toolbar-group" title="Top–bottom: vertical gap between ranks. Left–right: horizontal gap between columns.">
+      <span class="tb-label">Level gap</span>
+      <button type="button" id="btn-level-minus" aria-label="Decrease level gap">−</button>
+      <span class="tb-val" id="val-level-gap">—</span>
+      <button type="button" id="btn-level-plus" aria-label="Increase level gap">+</button>
+    </span>
+    <span class="toolbar-group" title="Top–bottom: horizontal gap on same rank. Left–right: vertical gap between siblings.">
+      <span class="tb-label">Sibling gap</span>
+      <button type="button" id="btn-node-minus" aria-label="Decrease sibling gap">−</button>
+      <span class="tb-val" id="val-node-gap">—</span>
+      <button type="button" id="btn-node-plus" aria-label="Increase sibling gap">+</button>
+    </span>
   </div>
   <div id="graph"></div>
   <script>
@@ -831,22 +847,38 @@ function wiringInteractiveVisHtml(payload) {
         );
       }
       var container = document.getElementById("graph");
-      /**
-       * LR: levelSeparation = horizontal gap between columns; nodeSpacing = vertical gap between siblings.
-       * UD: levelSeparation = vertical gap between ranks; nodeSpacing = horizontal gap on the same rank (raise if nodes overlap).
-       * Node widthConstraint + font.multi limits box width so ranks stay predictable.
-       */
-      function hierarchicalOptions(direction) {
-        var isLR = direction === "LR" || direction === "RL";
+      var GAP_STEP = 15;
+      var GAP_LIMITS = { levelMin: 45, levelMax: 520, nodeMin: 45, nodeMax: 480 };
+      function clampGap(n, lo, hi) {
+        return Math.max(lo, Math.min(hi, n));
+      }
+      var spacingPresets = {
+        UD: { levelSeparation: 105, nodeSpacing: 210, treeSpacing: 150 },
+        LR: { levelSeparation: 175, nodeSpacing: 100, treeSpacing: 230 },
+      };
+      var activeLayoutKey = "UD";
+      function currentSpacing() {
+        return spacingPresets[activeLayoutKey];
+      }
+      function visDirection() {
+        return activeLayoutKey === "LR" ? "LR" : "UD";
+      }
+      function isLRLayout() {
+        return activeLayoutKey === "LR";
+      }
+      function buildHierarchicalNetworkOptions() {
+        var dir = visDirection();
+        var isLR = isLRLayout();
+        var s = currentSpacing();
         return {
           layout: {
             hierarchical: {
               enabled: true,
-              direction: direction,
+              direction: dir,
               sortMethod: "directed",
-              nodeSpacing: isLR ? 165 : 210,
-              levelSeparation: isLR ? 270 : 105,
-              treeSpacing: isLR ? 230 : 150,
+              nodeSpacing: s.nodeSpacing,
+              levelSeparation: s.levelSeparation,
+              treeSpacing: s.treeSpacing,
               blockShifting: true,
               edgeMinimization: true,
               parentCentralization: true,
@@ -864,12 +896,25 @@ function wiringInteractiveVisHtml(payload) {
           },
         };
       }
+      function refreshGapLabels() {
+        var s = currentSpacing();
+        var elL = document.getElementById("val-level-gap");
+        var elN = document.getElementById("val-node-gap");
+        if (elL) elL.textContent = String(s.levelSeparation);
+        if (elN) elN.textContent = String(s.nodeSpacing);
+      }
+      function applyHierarchicalLayout(fitAnim) {
+        if (!payload.nodes.length) return;
+        network.setOptions(buildHierarchicalNetworkOptions());
+        refreshGapLabels();
+        fitAfterLayout(fitAnim);
+      }
       var options = {
         nodes: { borderWidth: 1, shadow: false, widthConstraint: { maximum: 260 } },
         interaction: { dragNodes: true, dragView: true, zoomView: true, multiselect: false },
       };
       if (payload.nodes.length) {
-        Object.assign(options, hierarchicalOptions("UD"));
+        Object.assign(options, buildHierarchicalNetworkOptions());
       } else {
         options.physics = false;
       }
@@ -888,21 +933,49 @@ function wiringInteractiveVisHtml(payload) {
         network.once("stabilizationEnd", once);
         setTimeout(once, 400);
       }
-      function setDirection(dir) {
-        network.setOptions(hierarchicalOptions(dir));
-        fitAfterLayout(false);
+      function setLayoutKey(key) {
+        activeLayoutKey = key === "LR" ? "LR" : "UD";
+        applyHierarchicalLayout(false);
+      }
+      function wireGapButtons() {
+        document.getElementById("btn-level-minus").addEventListener("click", function () {
+          var s = currentSpacing();
+          s.levelSeparation = clampGap(s.levelSeparation - GAP_STEP, GAP_LIMITS.levelMin, GAP_LIMITS.levelMax);
+          applyHierarchicalLayout(false);
+        });
+        document.getElementById("btn-level-plus").addEventListener("click", function () {
+          var s = currentSpacing();
+          s.levelSeparation = clampGap(s.levelSeparation + GAP_STEP, GAP_LIMITS.levelMin, GAP_LIMITS.levelMax);
+          applyHierarchicalLayout(false);
+        });
+        document.getElementById("btn-node-minus").addEventListener("click", function () {
+          var s = currentSpacing();
+          s.nodeSpacing = clampGap(s.nodeSpacing - GAP_STEP, GAP_LIMITS.nodeMin, GAP_LIMITS.nodeMax);
+          applyHierarchicalLayout(false);
+        });
+        document.getElementById("btn-node-plus").addEventListener("click", function () {
+          var s = currentSpacing();
+          s.nodeSpacing = clampGap(s.nodeSpacing + GAP_STEP, GAP_LIMITS.nodeMin, GAP_LIMITS.nodeMax);
+          applyHierarchicalLayout(false);
+        });
       }
       if (payload.nodes.length) {
+        refreshGapLabels();
         fitAfterLayout(true);
         document.getElementById("btn-tb").addEventListener("click", function () {
-          setDirection("UD");
+          setLayoutKey("UD");
         });
         document.getElementById("btn-lr").addEventListener("click", function () {
-          setDirection("LR");
+          setLayoutKey("LR");
         });
+        wireGapButtons();
       } else {
         document.getElementById("btn-tb").disabled = true;
         document.getElementById("btn-lr").disabled = true;
+        document.getElementById("btn-level-minus").disabled = true;
+        document.getElementById("btn-level-plus").disabled = true;
+        document.getElementById("btn-node-minus").disabled = true;
+        document.getElementById("btn-node-plus").disabled = true;
       }
       document.getElementById("btn-fit").addEventListener("click", function () {
         network.fit({ animation: { duration: 280, easingFunction: "easeInOutQuad" } });

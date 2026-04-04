@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
  * Package-level dependency graph: aggregate dependency-cruiser JSON into one node per
- * packages/<layer>/<name>, colored by layer — Mermaid HTML, JSON, vis-network interactive HTML,
- * DOT + optional Graphviz SVG.
+ * packages/<layer>/<name>, plus apps/<name> from workspace manifests — Mermaid HTML, JSON,
+ * vis-network interactive HTML, DOT + optional Graphviz SVG.
  */
 const fs = require("fs");
 const path = require("path");
@@ -10,6 +10,7 @@ const { spawnSync, execFileSync } = require("child_process");
 const {
   aggregatePackageGraph,
   mergeWorkspaceManifestEdges,
+  mergeAppWorkspaceEdges,
   toDot,
   toMermaid,
   toPackageGraphJson,
@@ -68,9 +69,12 @@ try {
 
 const { nodes, edges } = aggregatePackageGraph(cruise, repoRoot);
 mergeWorkspaceManifestEdges(repoRoot, nodes, edges);
+mergeAppWorkspaceEdges(repoRoot, nodes, edges);
 
 if (nodes.size === 0) {
-  console.error("[deps:graph] no packages under packages/<layer>/<name> found.");
+  console.error(
+    "[deps:graph] no nodes: add packages under packages/<layer>/<name> and/or apps/<name> with package.json."
+  );
   process.exit(1);
 }
 
@@ -107,7 +111,7 @@ function openInBrowser(filePath) {
 
 openInBrowser(absInteractive);
 console.log(
-  `[deps:graph] ${nodes.size} packages, ${edges.size} edges → opened ${path.relative(repoRoot, interactiveOut)}`
+  `[deps:graph] ${nodes.size} nodes, ${edges.size} edges → opened ${path.relative(repoRoot, interactiveOut)}`
 );
 console.log(
   `[deps:graph] also: ${path.relative(repoRoot, jsonOut)}, ${path.relative(repoRoot, htmlOut)} (Mermaid), ${path.relative(repoRoot, mmdOut)}`
