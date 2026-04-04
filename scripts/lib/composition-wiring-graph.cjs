@@ -692,6 +692,145 @@ function toWiringMermaid(nodes, edges) {
 }
 
 /**
+ * Portable graph snapshot (e.g. for vis-network, Cytoscape, or other tools).
+ * @param {Map<string, WiringNode>} nodes
+ * @param {WiringEdge[]} edges
+ * @returns {{ nodes: Array<{ id: string, label: string, kind: NodeKind }>, edges: Array<{ from: string, to: string }> }}
+ */
+function toWiringGraphJson(nodes, edges) {
+  const nodeList = [...nodes.values()]
+    .sort((a, b) => a.id.localeCompare(b.id))
+    .map((n) => ({ id: n.id, label: n.label, kind: n.kind }));
+  const edgeList = edges.map((e) => ({ from: e.from, to: e.to }));
+  return { nodes: nodeList, edges: edgeList };
+}
+
+/**
+ * Self-contained HTML: vis-network + embedded JSON (works from file://).
+ * @param {{ nodes: Array<{ id: string, label: string, kind: NodeKind }>, edges: Array<{ from: string, to: string }> }} payload
+ * @returns {string}
+ */
+function wiringInteractiveVisHtml(payload) {
+  const kindColorsJson = JSON.stringify(KIND_COLORS).replace(/</g, "\\u003c");
+  const dataJson = JSON.stringify(payload).replace(/</g, "\\u003c");
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Composition wiring (interactive)</title>
+  <script src="https://cdn.jsdelivr.net/npm/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; margin: 0; background: #f5f5f5; color: #263238; }
+    header { padding: 0.75rem 1rem; background: #fff; border-bottom: 1px solid #e0e0e0; }
+    h1 { font-size: 1rem; margin: 0 0 0.35rem; }
+    .hint { font-size: 0.8rem; color: #546e7a; max-width: 48rem; line-height: 1.4; margin: 0; }
+    #graph { width: 100%; height: calc(100vh - 5.5rem); background: #fafafa; }
+    .toolbar { padding: 0.35rem 1rem; background: #eee; font-size: 0.8rem; color: #455a64; }
+    .toolbar button {
+      margin-right: 0.5rem;
+      padding: 0.25rem 0.6rem;
+      font-size: 0.8rem;
+      cursor: pointer;
+      border: 1px solid #b0bec5;
+      border-radius: 4px;
+      background: #fff;
+    }
+    .toolbar button:hover { background: #eceff1; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Composition wiring — interactive (vis-network)</h1>
+    <p class="hint">Drag nodes, scroll to zoom, drag background to pan. Physics stops after layout so positions stay put. Same data as <code>composition-wiring.json</code>.</p>
+  </header>
+  <div class="toolbar">
+    <button type="button" id="btn-fit">Fit view</button>
+    <button type="button" id="btn-physics">Toggle physics</button>
+  </div>
+  <div id="graph"></div>
+  <script>
+    (function () {
+      var KIND_COLORS = ${kindColorsJson};
+      var payload = ${dataJson};
+      var visNodes;
+      var visEdges;
+      if (!payload.nodes.length) {
+        visNodes = new vis.DataSet([
+          {
+            id: "_empty",
+            label: "No graph yet\\nAdd packages under packages/composition",
+            color: { background: "#e1bee7", border: "#37474f" },
+            shape: "box",
+            margin: 16,
+            font: { color: "#111", size: 14 },
+          },
+        ]);
+        visEdges = new vis.DataSet([]);
+      } else {
+        visNodes = new vis.DataSet(
+          payload.nodes.map(function (n) {
+            var bg = KIND_COLORS[n.kind] || "#eceff1";
+            return {
+              id: n.id,
+              label: n.label,
+              color: { background: bg, border: "#37474f", highlight: { background: bg, border: "#111" } },
+              shape: "box",
+              margin: 12,
+              font: { color: "#111111", multi: true, size: 13 },
+            };
+          })
+        );
+        visEdges = new vis.DataSet(
+          payload.edges.map(function (e, i) {
+            return { id: "e" + i, from: e.from, to: e.to, arrows: "to", smooth: { type: "dynamic" } };
+          })
+        );
+      }
+      var container = document.getElementById("graph");
+      var physicsOn = true;
+      var options = {
+        nodes: { borderWidth: 1, shadow: false },
+        edges: { color: { color: "#78909c", highlight: "#37474f" } },
+        physics: {
+          enabled: true,
+          solver: "forceAtlas2Based",
+          forceAtlas2Based: {
+            gravitationalConstant: -60,
+            centralGravity: 0.008,
+            springLength: 160,
+            springConstant: 0.04,
+          },
+          stabilization: { iterations: 400, updateInterval: 25 },
+        },
+        interaction: { dragNodes: true, dragView: true, zoomView: true, multiselect: false },
+      };
+      var network = new vis.Network(container, { nodes: visNodes, edges: visEdges }, options);
+      if (!payload.nodes.length) {
+        network.setOptions({ physics: false });
+        physicsOn = false;
+      } else {
+        network.once("stabilizationIterationsDone", function () {
+          network.setOptions({ physics: false });
+          physicsOn = false;
+        });
+      }
+      document.getElementById("btn-fit").addEventListener("click", function () {
+        network.fit({ animation: { duration: 280, easingFunction: "easeInOutQuad" } });
+      });
+      document.getElementById("btn-physics").addEventListener("click", function () {
+        physicsOn = !physicsOn;
+        network.setOptions({ physics: { enabled: physicsOn } });
+      });
+    })();
+  </script>
+</body>
+</html>`;
+}
+
+/**
  * @param {string} mermaidSource
  * @returns {string}
  */
@@ -725,7 +864,9 @@ function wiringMermaidToHtml(mermaidSource) {
 module.exports = {
   buildCompositionWiringGraph,
   toWiringMermaid,
+  toWiringGraphJson,
   wiringMermaidToHtml,
+  wiringInteractiveVisHtml,
   KIND_COLORS,
   walkTsFiles,
   extractApplicationPackageNames,

@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
  * Package-level dependency graph: aggregate dependency-cruiser JSON into one node per
- * packages/<layer>/<name>, colored by layer, rendered as Mermaid in HTML (opens in browser).
+ * packages/<layer>/<name>, colored by layer — Mermaid HTML, JSON, vis-network interactive HTML,
+ * DOT + optional Graphviz SVG.
  */
 const fs = require("fs");
 const path = require("path");
@@ -11,12 +12,16 @@ const {
   mergeWorkspaceManifestEdges,
   toDot,
   toMermaid,
+  toPackageGraphJson,
   mermaidToHtml,
+  packageGraphInteractiveVisHtml,
 } = require("./lib/package-dependency-graph.cjs");
 
 const repoRoot = path.join(__dirname, "..");
-const outDir = path.join(repoRoot, ".dependency-cruiser-report");
-const htmlOut = path.join(outDir, "index.html");
+const outDir = path.join(repoRoot, "depcruiser-reports");
+const htmlOut = path.join(outDir, "packages.html");
+const interactiveOut = path.join(outDir, "packages-interactive.html");
+const jsonOut = path.join(outDir, "packages-graph.json");
 const dotOut = path.join(outDir, "packages.dot");
 const mmdOut = path.join(outDir, "packages.mmd");
 
@@ -74,6 +79,10 @@ fs.writeFileSync(mmdOut, `${mermaid}\n`, "utf8");
 fs.writeFileSync(dotOut, `${toDot(nodes, edges)}\n`, "utf8");
 fs.writeFileSync(htmlOut, mermaidToHtml(mermaid), "utf8");
 
+const pkgPayload = toPackageGraphJson(nodes, edges);
+fs.writeFileSync(jsonOut, `${JSON.stringify(pkgPayload, null, 2)}\n`, "utf8");
+fs.writeFileSync(interactiveOut, packageGraphInteractiveVisHtml(pkgPayload), "utf8");
+
 const dotSvg = spawnSync("dot", ["-T", "svg", "-o", path.join(outDir, "packages.svg"), dotOut], {
   cwd: repoRoot,
   encoding: "utf8",
@@ -84,7 +93,7 @@ if (dotSvg.status === 0) {
   console.log(`[deps:graph] skip packages.svg (install graphviz "dot" for SVG export)`);
 }
 
-const abs = path.resolve(htmlOut);
+const absInteractive = path.resolve(interactiveOut);
 
 function openInBrowser(filePath) {
   if (process.platform === "darwin") {
@@ -96,7 +105,10 @@ function openInBrowser(filePath) {
   }
 }
 
-openInBrowser(abs);
+openInBrowser(absInteractive);
 console.log(
-  `[deps:graph] ${nodes.size} packages, ${edges.size} edges → ${path.relative(repoRoot, htmlOut)}`
+  `[deps:graph] ${nodes.size} packages, ${edges.size} edges → opened ${path.relative(repoRoot, interactiveOut)}`
+);
+console.log(
+  `[deps:graph] also: ${path.relative(repoRoot, jsonOut)}, ${path.relative(repoRoot, htmlOut)} (Mermaid), ${path.relative(repoRoot, mmdOut)}`
 );

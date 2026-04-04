@@ -2,6 +2,7 @@
 /**
  * Composition wiring graph: apps → @composition/* → @application/* → modules → use-cases & flows
  * → domain entities/services (path / import heuristics; see scripts/lib/composition-wiring-graph.cjs).
+ * Writes Mermaid + JSON + vis-network interactive HTML; optional Graphviz SVG when `dot` is installed.
  */
 const fs = require("fs");
 const path = require("path");
@@ -9,12 +10,16 @@ const { spawnSync, execFileSync } = require("child_process");
 const {
   buildCompositionWiringGraph,
   toWiringMermaid,
+  toWiringGraphJson,
   wiringMermaidToHtml,
+  wiringInteractiveVisHtml,
 } = require("./lib/composition-wiring-graph.cjs");
 
 const repoRoot = path.join(__dirname, "..");
-const outDir = path.join(repoRoot, ".dependency-cruiser-report");
+const outDir = path.join(repoRoot, "depcruiser-reports");
 const htmlOut = path.join(outDir, "composition-wiring.html");
+const interactiveOut = path.join(outDir, "composition-wiring-interactive.html");
+const jsonOut = path.join(outDir, "composition-wiring.json");
 const mmdOut = path.join(outDir, "composition-wiring.mmd");
 
 fs.mkdirSync(outDir, { recursive: true });
@@ -34,6 +39,10 @@ if (nodes.size === 0) {
 
 fs.writeFileSync(mmdOut, `${mermaid}\n`, "utf8");
 fs.writeFileSync(htmlOut, wiringMermaidToHtml(mermaid), "utf8");
+
+const wiringPayload = toWiringGraphJson(nodes, edges);
+fs.writeFileSync(jsonOut, `${JSON.stringify(wiringPayload, null, 2)}\n`, "utf8");
+fs.writeFileSync(interactiveOut, wiringInteractiveVisHtml(wiringPayload), "utf8");
 
 const dotLines = [
   'strict digraph "composition_wiring" {',
@@ -82,7 +91,7 @@ if (dotSvg.status === 0) {
   console.log('[deps:graph:composition] skip composition-wiring.svg (install graphviz "dot")');
 }
 
-const abs = path.resolve(htmlOut);
+const absInteractive = path.resolve(interactiveOut);
 
 function openInBrowser(filePath) {
   if (process.platform === "darwin") {
@@ -94,7 +103,10 @@ function openInBrowser(filePath) {
   }
 }
 
-openInBrowser(abs);
+openInBrowser(absInteractive);
 console.log(
-  `[deps:graph:composition] ${nodes.size} nodes, ${edges.length} edges → ${path.relative(repoRoot, htmlOut)}`
+  `[deps:graph:composition] ${nodes.size} nodes, ${edges.length} edges → opened ${path.relative(repoRoot, interactiveOut)}`
+);
+console.log(
+  `[deps:graph:composition] also: ${path.relative(repoRoot, jsonOut)}, ${path.relative(repoRoot, htmlOut)} (Mermaid), ${path.relative(repoRoot, mmdOut)}`
 );

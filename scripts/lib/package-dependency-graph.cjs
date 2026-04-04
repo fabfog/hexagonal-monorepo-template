@@ -204,6 +204,132 @@ function toMermaid(nodes, edges) {
 }
 
 /**
+ * Portable snapshot for vis-network / other tools.
+ * @param {Map<string, PkgNode>} nodes
+ * @param {Set<string>} edges keys "fromId->toId"
+ * @returns {{ nodes: Array<{ id: string, label: string, layer: string }>, edges: Array<{ from: string, to: string }> }}
+ */
+function toPackageGraphJson(nodes, edges) {
+  const nodeList = [...nodes.values()]
+    .sort((a, b) => a.id.localeCompare(b.id))
+    .map((n) => ({ id: n.id, label: n.label, layer: n.layer }));
+  const edgeList = [...edges]
+    .sort()
+    .map((s) => {
+      const arrow = s.indexOf("->");
+      const from = arrow === -1 ? s : s.slice(0, arrow);
+      const to = arrow === -1 ? "" : s.slice(arrow + 2);
+      return { from, to };
+    })
+    .filter((e) => e.from && e.to);
+  return { nodes: nodeList, edges: edgeList };
+}
+
+/**
+ * Self-contained HTML: vis-network + embedded JSON (works from file://).
+ * @param {{ nodes: Array<{ id: string, label: string, layer: string }>, edges: Array<{ from: string, to: string }> }} payload
+ * @returns {string}
+ */
+function packageGraphInteractiveVisHtml(payload) {
+  const layerColorsJson = JSON.stringify(LAYER_COLORS).replace(/</g, "\\u003c");
+  const dataJson = JSON.stringify(payload).replace(/</g, "\\u003c");
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Package dependency graph (interactive)</title>
+  <script src="https://cdn.jsdelivr.net/npm/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; margin: 0; background: #f5f5f5; color: #263238; }
+    header { padding: 0.75rem 1rem; background: #fff; border-bottom: 1px solid #e0e0e0; }
+    h1 { font-size: 1rem; margin: 0 0 0.35rem; }
+    .hint { font-size: 0.8rem; color: #546e7a; max-width: 48rem; line-height: 1.4; margin: 0; }
+    #graph { width: 100%; height: calc(100vh - 5.5rem); background: #fafafa; }
+    .toolbar { padding: 0.35rem 1rem; background: #eee; font-size: 0.8rem; color: #455a64; }
+    .toolbar button {
+      margin-right: 0.5rem;
+      padding: 0.25rem 0.6rem;
+      font-size: 0.8rem;
+      cursor: pointer;
+      border: 1px solid #b0bec5;
+      border-radius: 4px;
+      background: #fff;
+    }
+    .toolbar button:hover { background: #eceff1; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Package dependency graph — interactive (vis-network)</h1>
+    <p class="hint">One node per <code>packages/&lt;layer&gt;/&lt;name&gt;</code>. Drag nodes, scroll to zoom, drag background to pan. Same data as <code>packages-graph.json</code>. Edges = workspace deps + dependency-cruiser cross-package imports.</p>
+  </header>
+  <div class="toolbar">
+    <button type="button" id="btn-fit">Fit view</button>
+    <button type="button" id="btn-physics">Toggle physics</button>
+  </div>
+  <div id="graph"></div>
+  <script>
+    (function () {
+      var LAYER_COLORS = ${layerColorsJson};
+      var payload = ${dataJson};
+      var visNodes = new vis.DataSet(
+        payload.nodes.map(function (n) {
+          var bg = LAYER_COLORS[n.layer] || LAYER_COLORS.default;
+          return {
+            id: n.id,
+            label: n.label,
+            color: { background: bg, border: "#37474f", highlight: { background: bg, border: "#111" } },
+            shape: "box",
+            margin: 12,
+            font: { color: "#111111", multi: true, size: 13 },
+          };
+        })
+      );
+      var visEdges = new vis.DataSet(
+        payload.edges.map(function (e, i) {
+          return { id: "e" + i, from: e.from, to: e.to, arrows: "to", smooth: { type: "dynamic" } };
+        })
+      );
+      var container = document.getElementById("graph");
+      var physicsOn = true;
+      var options = {
+        nodes: { borderWidth: 1, shadow: false },
+        edges: { color: { color: "#78909c", highlight: "#37474f" } },
+        physics: {
+          enabled: true,
+          solver: "forceAtlas2Based",
+          forceAtlas2Based: {
+            gravitationalConstant: -60,
+            centralGravity: 0.008,
+            springLength: 180,
+            springConstant: 0.04,
+          },
+          stabilization: { iterations: 400, updateInterval: 25 },
+        },
+        interaction: { dragNodes: true, dragView: true, zoomView: true, multiselect: false },
+      };
+      var network = new vis.Network(container, { nodes: visNodes, edges: visEdges }, options);
+      network.once("stabilizationIterationsDone", function () {
+        network.setOptions({ physics: false });
+        physicsOn = false;
+      });
+      document.getElementById("btn-fit").addEventListener("click", function () {
+        network.fit({ animation: { duration: 280, easingFunction: "easeInOutQuad" } });
+      });
+      document.getElementById("btn-physics").addEventListener("click", function () {
+        physicsOn = !physicsOn;
+        network.setOptions({ physics: { enabled: physicsOn } });
+      });
+    })();
+  </script>
+</body>
+</html>`;
+}
+
+/**
  * @param {string} mermaidSource
  * @returns {string} standalone HTML
  */
@@ -240,6 +366,8 @@ module.exports = {
   packageFromFilePath,
   toDot,
   toMermaid,
+  toPackageGraphJson,
   mermaidToHtml,
+  packageGraphInteractiveVisHtml,
   LAYER_COLORS,
 };

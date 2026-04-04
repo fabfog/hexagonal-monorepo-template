@@ -1,4 +1,4 @@
 node_modules
 
 # dependency-cruiser HTML report (pnpm deps:graph)
-.dependency-cruiser-report/
+depcruiser-reports/
