@@ -20,13 +20,15 @@
  * Also adds an example flow (`EscalateTicket` + interaction port), then an application module under
  * `src/modules/`: `application-module` wires `GetTicketById` + that flow, then `application-wire-module`
  * adds `UpdateTicket`.
- * Wiring that module into `@composition/<name>` `get*Modules(ctx)` is left manual (or to your app).
+ * Then `composition-wire-module` wires `SupportInboxModule` into `@composition/demo-web` `getDemoWebModules`.
  */
 
 const fs = require("fs");
 const path = require("path");
 const { spawnSync } = require("child_process");
-const { toKebabCase } = require(path.join(__dirname, "..", "..", "plop", "lib", "casing.cjs"));
+const { toKebabCase, toCamelCase } = require(
+  path.join(__dirname, "..", "..", "plop", "lib", "casing.cjs")
+);
 
 const {
   DEMO_APPLICATION,
@@ -45,6 +47,8 @@ const {
 const REPO_ROOT = repoRootFromScriptsDemo();
 /** `support-inbox.module.ts` when `DEMO_MODULE_NAME` is `SupportInbox`. */
 const DEMO_MODULE_FILE = `${toKebabCase(DEMO_MODULE_NAME)}.module.ts`;
+/** Property key in composition `get*Modules` return object (`supportInbox` for `SupportInbox`). */
+const DEMO_MODULE_PROPERTY_KEY = toCamelCase(DEMO_MODULE_NAME);
 const MARKER = getDemoMarkerPath(REPO_ROOT);
 
 function assertCleanOrForce() {
@@ -311,6 +315,16 @@ const STEPS = /** @type {DemoStep[]} */ ([
     answers: { name: DEMO_COMPOSITION },
   },
   {
+    name: "composition-wire-module",
+    note: `Wire ${DEMO_MODULE_NAME}Module into @composition/${DEMO_COMPOSITION} get*Modules return`,
+    answers: {
+      compositionPackage: DEMO_COMPOSITION,
+      applicationPackage: DEMO_APPLICATION,
+      moduleFileName: DEMO_MODULE_FILE,
+      propertyKey: DEMO_MODULE_PROPERTY_KEY,
+    },
+  },
+  {
     name: "__pnpm_install__",
     note: "final pnpm install",
     run: () => {
@@ -369,7 +383,9 @@ async function main() {
   }
 
   console.log(
-    "\n[demo] Done. Next: wire composition (infrastructure, modules / dependencies, use-cases) by hand or add apps in a follow-up."
+    "\n[demo] Done. Next: implement `getForContext` in composition infrastructure so it satisfies module Infra types, then hook apps to `@composition/" +
+      DEMO_COMPOSITION +
+      "`."
   );
 }
 

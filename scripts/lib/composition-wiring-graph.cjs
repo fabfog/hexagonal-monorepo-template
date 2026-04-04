@@ -4,29 +4,41 @@ const fs = require("fs");
 const path = require("path");
 
 /**
- * Graph: composition package → application packages (from @application imports) → *.module.ts
- * → use-cases / flows referenced in module source (path regex only, no metadata).
+ * Graph: apps → composition → application → modules → use-cases / flows → domain entities & services
+ * (path / import-string heuristics only, no metadata).
  */
 
-/** @typedef {"composition" | "application" | "module" | "useCase" | "flow"} NodeKind */
+/** @typedef {"app" | "composition" | "application" | "module" | "useCase" | "flow" | "domainEntity" | "domainService"} NodeKind */
 
 /** @typedef {{ id: string, kind: NodeKind, label: string }} WiringNode */
 
 /** @typedef {{ from: string, to: string }} WiringEdge */
 
+/**
+ * Reduces false matches from examples in JSDoc / line comments (not a full TS lexer).
+ * @param {string} source
+ */
+function stripTsCommentsApprox(source) {
+  return source.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/^\s*\/\/.*$/gm, " ");
+}
+
 const KIND_COLORS = {
+  app: "#c5cae9",
   composition: "#e1bee7",
   application: "#c8e6c9",
   module: "#fff9c4",
   useCase: "#b3e5fc",
   flow: "#ffccbc",
+  domainEntity: "#90caf9",
+  domainService: "#64b5f6",
 };
 
 /**
  * @param {string} dir
+ * @param {string[]} [extensions]
  * @returns {string[]}
  */
-function walkTsFiles(dir) {
+function walkTsFiles(dir, extensions = [".ts"]) {
   /** @type {string[]} */
   const out = [];
   if (!fs.existsSync(dir)) return out;
@@ -46,8 +58,16 @@ function walkTsFiles(dir) {
         stack.push(full);
         continue;
       }
-      if (!e.isFile() || !e.name.endsWith(".ts")) continue;
-      if (e.name.endsWith(".test.ts") || e.name.endsWith(".spec.ts")) continue;
+      if (!e.isFile()) continue;
+      if (!extensions.some((ext) => e.name.endsWith(ext))) continue;
+      if (
+        e.name.endsWith(".test.ts") ||
+        e.name.endsWith(".spec.ts") ||
+        e.name.endsWith(".test.tsx") ||
+        e.name.endsWith(".spec.tsx")
+      ) {
+        continue;
+      }
       out.push(full);
     }
   }
@@ -61,13 +81,249 @@ function walkTsFiles(dir) {
  */
 function extractApplicationPackageNames(source) {
   const names = new Set();
+  const cleaned = stripTsCommentsApprox(source);
   const re = /@application\/([^/"'\s]+)/g;
   let m;
-  while ((m = re.exec(source)) !== null) {
+  while ((m = re.exec(cleaned)) !== null) {
     const first = m[1].split("/")[0];
     if (first) names.add(first);
   }
   return [...names];
+}
+
+/**
+ * First path segment after @composition/ (package folder under packages/composition).
+ * @param {string} source
+ * @returns {string[]}
+ */
+function extractCompositionPackageNames(source) {
+  const names = new Set();
+  const cleaned = stripTsCommentsApprox(source);
+  const re = /@composition\/([^/"'\s]+)/g;
+  let m;
+  while ((m = re.exec(cleaned)) !== null) {
+    const first = m[1].split("/")[0];
+    if (first) names.add(first);
+  }
+  return [...names];
+}
+
+/**
+ * @param {string} name
+ */
+function pascalToKebab(name) {
+  const s = String(name).trim();
+  if (!s) return "";
+  return s
+    .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
+    .replace(/([A-Z])([A-Z][a-z])/g, "$1-$2")
+    .toLowerCase();
+}
+
+/**
+ * @param {string} inner brace content of import { ... }
+ * @returns {string[]}
+ */
+function parseNamedImportIdentifiers(inner) {
+  const ids = [];
+  const stripped = inner.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/\/\/.*/g, " ");
+  for (const part of stripped.split(",")) {
+    let p = part.trim();
+    if (!p) continue;
+    p = p.replace(/^type\s+/, "").trim();
+    const asIdx = p.lastIndexOf(" as ");
+    if (asIdx !== -1) p = p.slice(0, asIdx).trim();
+    if (!p || p === "type") continue;
+    if (!/^[A-Za-z_][\w]*$/.test(p)) continue;
+    ids.push(p);
+  }
+  return ids;
+}
+
+/**
+ * @param {string} repoRoot
+ * @param {string} domainPkg
+ * @param {string} className
+ * @returns {string | null} kebab file stem (no .entity.ts)
+ */
+function resolveEntityKebab(repoRoot, domainPkg, className) {
+  const baseDir = path.join(repoRoot, "packages", "domain", domainPkg, "src", "entities");
+  const candidates = [
+    `${pascalToKebab(className)}.entity.ts`,
+    `${pascalToKebab(className.replace(/Entity$/, ""))}.entity.ts`,
+  ];
+  for (const c of candidates) {
+    const abs = path.join(baseDir, c);
+    if (fs.existsSync(abs)) return c.replace(/\.entity\.ts$/, "");
+  }
+  return null;
+}
+
+/**
+ * @param {string} repoRoot
+ * @param {string} domainPkg
+ * @param {string} className
+ * @returns {string | null} kebab file stem (no .service.ts)
+ */
+function resolveServiceKebab(repoRoot, domainPkg, className) {
+  const baseDir = path.join(repoRoot, "packages", "domain", domainPkg, "src", "services");
+  const stem = className.endsWith("Service") ? className.slice(0, -7) : className;
+  const candidates = [
+    `${pascalToKebab(stem)}.service.ts`,
+    `${pascalToKebab(className)}.service.ts`,
+  ];
+  for (const c of candidates) {
+    const abs = path.join(baseDir, c);
+    if (fs.existsSync(abs)) return c.replace(/\.service\.ts$/, "");
+  }
+  return null;
+}
+
+/**
+ * First `export class Name` in an entity or domain service module.
+ * @param {string} absPath
+ * @returns {string | null}
+ */
+function readExportedDomainClassName(absPath) {
+  if (!fs.existsSync(absPath)) return null;
+  const text = fs.readFileSync(absPath, "utf8");
+  const m = text.match(/export\s+class\s+([A-Za-z_][\w]*)/);
+  return m ? m[1] : null;
+}
+
+/**
+ * @param {string} kebabStem file stem (e.g. order-line)
+ */
+function kebabStemToPascal(kebabStem) {
+  return kebabStem
+    .split("-")
+    .filter(Boolean)
+    .map((p) => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase())
+    .join("");
+}
+
+/**
+ * @param {string} source
+ * @param {string} repoRoot
+ * @param {(kind: "domainEntity" | "domainService", domainPkg: string, className: string, label: string) => void} onRef
+ */
+function extractDomainEntityAndServiceRefs(source, repoRoot, onRef) {
+  const cleaned = stripTsCommentsApprox(source);
+  // Use [^}]* not [\s\S]*? so the closing `}` cannot pair with a different statement's `}`.
+  // Otherwise `import type { ...` on line 1 can wrongly match the `}` of a later `import { X } from "@domain/..."`.
+  const barrelRe =
+    /import\s+(?:type\s+)?\{([^}]*)\}\s+from\s+["']@domain\/([^/"']+)\/(entities|services)["']\s*;/g;
+  let m;
+  while ((m = barrelRe.exec(cleaned)) !== null) {
+    const inner = m[1];
+    const domainPkg = m[2];
+    const slice = m[3];
+    const pkgPath = path.join(repoRoot, "packages", "domain", domainPkg, "package.json");
+    if (!fs.existsSync(pkgPath)) continue;
+    for (const id of parseNamedImportIdentifiers(inner)) {
+      if (slice === "entities") {
+        const kebab = resolveEntityKebab(repoRoot, domainPkg, id);
+        if (kebab) onRef("domainEntity", domainPkg, id, `@domain/${domainPkg}/entities\n${id}`);
+      } else {
+        const kebab = resolveServiceKebab(repoRoot, domainPkg, id);
+        if (kebab) onRef("domainService", domainPkg, id, `@domain/${domainPkg}/services\n${id}`);
+      }
+    }
+  }
+
+  const entitySubRe =
+    /import\s+(?:type\s+)?\{([^}]*)\}\s+from\s+["']@domain\/([^/"']+)\/entities\/([a-z0-9-]+)(?:\.entity)?["']\s*;/g;
+  while ((m = entitySubRe.exec(cleaned)) !== null) {
+    const domainPkg = m[2];
+    const stem = m[3];
+    const pkgPath = path.join(repoRoot, "packages", "domain", domainPkg, "package.json");
+    if (!fs.existsSync(pkgPath)) continue;
+    const abs = path.join(
+      repoRoot,
+      "packages",
+      "domain",
+      domainPkg,
+      "src",
+      "entities",
+      `${stem}.entity.ts`
+    );
+    if (fs.existsSync(abs)) {
+      const ids = parseNamedImportIdentifiers(m[1]);
+      const className =
+        ids[0] || readExportedDomainClassName(abs) || `${kebabStemToPascal(stem)}Entity`;
+      onRef("domainEntity", domainPkg, className, `@domain/${domainPkg}/entities → ${className}`);
+    }
+  }
+
+  const entitySubDefaultRe =
+    /import\s+(?:type\s+)?(\w+)\s+from\s+["']@domain\/([^/"']+)\/entities\/([a-z0-9-]+)(?:\.entity)?["']\s*;/g;
+  while ((m = entitySubDefaultRe.exec(cleaned)) !== null) {
+    const domainPkg = m[2];
+    const stem = m[3];
+    const pkgPath = path.join(repoRoot, "packages", "domain", domainPkg, "package.json");
+    if (!fs.existsSync(pkgPath)) continue;
+    const abs = path.join(
+      repoRoot,
+      "packages",
+      "domain",
+      domainPkg,
+      "src",
+      "entities",
+      `${stem}.entity.ts`
+    );
+    if (fs.existsSync(abs)) {
+      const localName = m[1];
+      const className = readExportedDomainClassName(abs) || localName;
+      onRef("domainEntity", domainPkg, className, `@domain/${domainPkg}/entities → ${className}`);
+    }
+  }
+
+  const serviceSubRe =
+    /import\s+(?:type\s+)?\{([^}]*)\}\s+from\s+["']@domain\/([^/"']+)\/services\/([a-z0-9-]+)(?:\.service)?["']\s*;/g;
+  while ((m = serviceSubRe.exec(cleaned)) !== null) {
+    const domainPkg = m[2];
+    const stem = m[3];
+    const pkgPath = path.join(repoRoot, "packages", "domain", domainPkg, "package.json");
+    if (!fs.existsSync(pkgPath)) continue;
+    const abs = path.join(
+      repoRoot,
+      "packages",
+      "domain",
+      domainPkg,
+      "src",
+      "services",
+      `${stem}.service.ts`
+    );
+    if (fs.existsSync(abs)) {
+      const ids = parseNamedImportIdentifiers(m[1]);
+      const className =
+        ids[0] || readExportedDomainClassName(abs) || `${kebabStemToPascal(stem)}Service`;
+      onRef("domainService", domainPkg, className, `@domain/${domainPkg}/services → ${className}`);
+    }
+  }
+
+  const serviceSubDefaultRe =
+    /import\s+(?:type\s+)?(\w+)\s+from\s+["']@domain\/([^/"']+)\/services\/([a-z0-9-]+)(?:\.service)?["']\s*;/g;
+  while ((m = serviceSubDefaultRe.exec(cleaned)) !== null) {
+    const domainPkg = m[2];
+    const stem = m[3];
+    const pkgPath = path.join(repoRoot, "packages", "domain", domainPkg, "package.json");
+    if (!fs.existsSync(pkgPath)) continue;
+    const abs = path.join(
+      repoRoot,
+      "packages",
+      "domain",
+      domainPkg,
+      "src",
+      "services",
+      `${stem}.service.ts`
+    );
+    if (fs.existsSync(abs)) {
+      const localName = m[1];
+      const className = readExportedDomainClassName(abs) || localName;
+      onRef("domainService", domainPkg, className, `@domain/${domainPkg}/services → ${className}`);
+    }
+  }
 }
 
 /**
@@ -77,6 +333,7 @@ function extractApplicationPackageNames(source) {
 function extractWiredSlicesFromModuleSource(moduleFileContent) {
   const useCases = new Set();
   const flows = new Set();
+  const cleaned = stripTsCommentsApprox(moduleFileContent);
 
   const ucPatterns = [
     /\.\.\/use-cases\/([a-z0-9-]+)\.use-case/g,
@@ -89,11 +346,11 @@ function extractWiredSlicesFromModuleSource(moduleFileContent) {
 
   for (const re of ucPatterns) {
     let m;
-    while ((m = re.exec(moduleFileContent)) !== null) useCases.add(m[1]);
+    while ((m = re.exec(cleaned)) !== null) useCases.add(m[1]);
   }
   for (const re of flowPatterns) {
     let m;
-    while ((m = re.exec(moduleFileContent)) !== null) flows.add(m[1]);
+    while ((m = re.exec(cleaned)) !== null) flows.add(m[1]);
   }
 
   return {
@@ -113,6 +370,63 @@ function mermaidSafeId(s) {
  * @param {string} repoRoot
  * @returns {{ nodes: Map<string, WiringNode>, edges: WiringEdge[] }}
  */
+/**
+ * @param {string} repoRoot
+ * @param {string} absPath
+ * @param {string} consumerId
+ * @param {(id: string, kind: NodeKind, label: string) => void} addNode
+ * @param {WiringEdge[]} edges
+ */
+function wireConsumerToDomain(repoRoot, absPath, consumerId, addNode, edges) {
+  if (!fs.existsSync(absPath)) return;
+  const text = fs.readFileSync(absPath, "utf8");
+  extractDomainEntityAndServiceRefs(text, repoRoot, (kind, domainPkg, className, label) => {
+    const prefix = kind === "domainEntity" ? "de" : "ds";
+    const nid = `${prefix}_${mermaidSafeId(domainPkg)}_${mermaidSafeId(className)}`;
+    addNode(nid, kind, label);
+    edges.push({ from: consumerId, to: nid });
+  });
+}
+
+/**
+ * @param {string} repoRoot
+ * @param {Map<string, WiringNode>} nodes
+ * @param {WiringEdge[]} edges
+ * @param {(id: string, kind: NodeKind, label: string) => void} addNode
+ * @param {Set<string>} compositionFolderNames
+ */
+function appendAppToCompositionEdges(repoRoot, nodes, edges, addNode, compositionFolderNames) {
+  const appsRoot = path.join(repoRoot, "apps");
+  if (!fs.existsSync(appsRoot)) return;
+
+  const appDirs = fs
+    .readdirSync(appsRoot, { withFileTypes: true })
+    .filter((d) => d.isDirectory())
+    .map((d) => d.name)
+    .filter((name) => fs.existsSync(path.join(appsRoot, name, "package.json")))
+    .sort();
+
+  for (const appName of appDirs) {
+    const srcDir = path.join(appsRoot, appName, "src");
+    /** @type {Set<string>} */
+    const compRefs = new Set();
+    for (const file of walkTsFiles(srcDir, [".ts", ".tsx"])) {
+      const text = fs.readFileSync(file, "utf8");
+      for (const c of extractCompositionPackageNames(text)) {
+        if (compositionFolderNames.has(c)) compRefs.add(c);
+      }
+    }
+    if (compRefs.size === 0) continue;
+
+    const appId = `app_${mermaidSafeId(appName)}`;
+    addNode(appId, "app", `apps/${appName}`);
+    for (const c of [...compRefs].sort()) {
+      const cid = `c_${mermaidSafeId(c)}`;
+      if (nodes.has(cid)) edges.push({ from: appId, to: cid });
+    }
+  }
+}
+
 function buildCompositionWiringGraph(repoRoot) {
   /** @type {Map<string, WiringNode>} */
   const nodes = new Map();
@@ -135,13 +449,15 @@ function buildCompositionWiringGraph(repoRoot) {
     .filter((name) => fs.existsSync(path.join(compositionRoot, name, "package.json")))
     .sort();
 
+  const compositionFolderNames = new Set(compDirs);
+
   for (const compName of compDirs) {
     const cid = `c_${mermaidSafeId(compName)}`;
     addNode(cid, "composition", `@composition/${compName}`);
 
     const srcDir = path.join(compositionRoot, compName, "src");
     const appNames = new Set();
-    for (const file of walkTsFiles(srcDir)) {
+    for (const file of walkTsFiles(srcDir, [".ts", ".tsx"])) {
       const text = fs.readFileSync(file, "utf8");
       for (const pkg of extractApplicationPackageNames(text)) {
         const appPath = path.join(repoRoot, "packages", "application", pkg, "package.json");
@@ -187,6 +503,7 @@ function buildCompositionWiringGraph(repoRoot) {
           const uid = `uc_${mermaidSafeId(appName)}_${mermaidSafeId(uc)}`;
           addNode(uid, "useCase", `${uc}.use-case`);
           edges.push({ from: mid, to: uid });
+          wireConsumerToDomain(repoRoot, ucPath, uid, addNode, edges);
         }
         for (const fl of flows) {
           const flPath = path.join(
@@ -202,10 +519,13 @@ function buildCompositionWiringGraph(repoRoot) {
           const fid = `fl_${mermaidSafeId(appName)}_${mermaidSafeId(fl)}`;
           addNode(fid, "flow", `${fl}.flow`);
           edges.push({ from: mid, to: fid });
+          wireConsumerToDomain(repoRoot, flPath, fid, addNode, edges);
         }
       }
     }
   }
+
+  appendAppToCompositionEdges(repoRoot, nodes, edges, addNode, compositionFolderNames);
 
   return { nodes, edges };
 }
@@ -260,8 +580,8 @@ function wiringMermaidToHtml(mermaidSource) {
   </style>
 </head>
 <body>
-  <h1>Composition → application → modules → use-cases &amp; flows</h1>
-  <p class="hint">Derived from file paths and import strings only (no extra metadata). <strong>Composition</strong> packages: scan <code>packages/composition/&lt;name&gt;/src/**/*.ts</code> for <code>@application/&lt;pkg&gt;/…</code>. <strong>Modules</strong>: <code>packages/application/&lt;pkg&gt;/src/modules/*.module.ts</code>. <strong>Wires</strong>: regex on module source for <code>../use-cases/&lt;kebab&gt;.use-case</code> and <code>../flows/&lt;kebab&gt;.flow</code> (or <code>@application/&lt;pkg&gt;/use-cases|flows/…</code>); an edge is drawn only if the matching <code>.use-case.ts</code> / <code>.flow.ts</code> file exists.</p>
+  <h1>Composition wiring (apps, application, domain)</h1>
+  <p class="hint">Derived from file paths and import strings only (no extra metadata). <strong>Apps</strong>: <code>apps/&lt;name&gt;/src/**/*.{ts,tsx}</code> referencing <code>@composition/&lt;pkg&gt;</code> (existing composition packages only). <strong>Composition → application</strong>: scan composition <code>src</code> for <code>@application/&lt;pkg&gt;/…</code>. <strong>Modules</strong> and <strong>use-case / flow</strong> wiring unchanged. <strong>Domain</strong>: from each <code>*.use-case.ts</code> and <code>*.flow.ts</code>, parse <code>@domain/&lt;pkg&gt;/entities</code> and <code>…/services</code> (barrel or subpath); edges only if the matching <code>.entity.ts</code> / <code>.service.ts</code> exists. <strong>Domain nodes</strong> are labeled with the <strong>PascalCase</strong> class name (import symbol for barrels; first <code>export class</code> in the slice file for subpath, with a kebab→Pascal fallback if needed).</p>
   <pre class="mermaid">${safe}</pre>
 </body>
 </html>`;
@@ -274,5 +594,11 @@ module.exports = {
   KIND_COLORS,
   walkTsFiles,
   extractApplicationPackageNames,
+  extractCompositionPackageNames,
   extractWiredSlicesFromModuleSource,
+  extractDomainEntityAndServiceRefs,
+  readExportedDomainClassName,
+  pascalToKebab,
+  resolveEntityKebab,
+  resolveServiceKebab,
 };

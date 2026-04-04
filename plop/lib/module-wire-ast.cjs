@@ -755,4 +755,5 @@ module.exports = {
   buildEmptyModuleSource,
   getWiredSliceClassNamesFromModule,
   wireAdditionalSlicesIntoModuleFile,
+  appendImportsIfMissing,
 };

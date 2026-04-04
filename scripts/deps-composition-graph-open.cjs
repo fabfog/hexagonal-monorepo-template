@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * Composition wiring graph: @composition/* → @application/* → *.module.ts → use-cases & flows
- * (path / import-string heuristics only; see scripts/lib/composition-wiring-graph.cjs).
+ * Composition wiring graph: apps → @composition/* → @application/* → modules → use-cases & flows
+ * → domain entities/services (path / import heuristics; see scripts/lib/composition-wiring-graph.cjs).
  */
 const fs = require("fs");
 const path = require("path");
@@ -44,11 +44,14 @@ const dotLines = [
 ];
 
 const kindFill = {
+  app: "#c5cae9",
   composition: "#e1bee7",
   application: "#c8e6c9",
   module: "#fff9c4",
   useCase: "#b3e5fc",
   flow: "#ffccbc",
+  domainEntity: "#90caf9",
+  domainService: "#64b5f6",
 };
 
 function dotId(id) {

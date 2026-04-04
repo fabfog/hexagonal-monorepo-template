@@ -69,6 +69,19 @@ function getApplicationModuleFileChoices(repoRoot, applicationPackage) {
 }
 
 /**
+ * Application packages (excluding core) that have at least one `src/modules/*.module.ts`.
+ * @param {string} repoRoot
+ * @returns {{ name: string, value: string }[]}
+ */
+function getApplicationPackagesWithModulesChoices(repoRoot) {
+  const names = listChildDirectoryNames(layerRoot(repoRoot, "application"), {
+    exclude: ["core"],
+  });
+  const withModules = names.filter((n) => getApplicationModuleFileChoices(repoRoot, n).length > 0);
+  return toPlopChoices(withModules);
+}
+
+/**
  * @param {string} repoRoot
  * @param {{ excludeCore?: boolean }} [options] excludeCore defaults to true
  */
@@ -547,6 +560,7 @@ module.exports = {
   listChildDirectoryNames,
   toPlopChoices,
   getApplicationPackageChoices,
+  getApplicationPackagesWithModulesChoices,
   getApplicationModuleFileChoices,
   getDomainPackageChoices,
   getDomainPackageNamesOrThrow,
