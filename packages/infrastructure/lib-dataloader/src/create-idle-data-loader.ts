@@ -9,9 +9,13 @@ export interface IdleDataLoaderHandle<K, V, _C = K> {
 }
 
 /**
- * Wraps {@link DataLoaderRegistry#getOrCreate} with optional idle clearing: after
- * `idleMs` milliseconds without a {@link IdleDataLoaderHandle.load} call, runs
- * `clearAll()` on that loader instance.
+ * Advanced helper for long-lived runtimes: wraps {@link DataLoaderRegistry#getOrCreate}
+ * with optional idle clearing. For request-scoped caching, prefer
+ * {@link createDataLoaderRegistry} directly and let the request lifecycle drop the loaders.
+ *
+ * When `idleMs` is explicitly provided and greater than zero, after that many milliseconds
+ * without a {@link IdleDataLoaderHandle.load} call, this wrapper runs `clearAll()` on the
+ * loader instance. No default idle timeout is applied.
  */
 export function createIdleDataLoader<K, V, C = K>(options: {
   registry: DataLoaderRegistry;

@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const { toPascalCase } = require("./casing.cjs");
+const { resolveWorkspaceDependencyVersion } = require("./workspace-dependency-version.cjs");
 
 /** @param {string} repoRoot */
 function layerRoot(repoRoot, layer) {
@@ -465,7 +466,7 @@ function ensureZodDependencyInDomainPackage(repoRoot, domainPackageName) {
   const pkg = readPackageJson(pkgPath);
   pkg.dependencies = pkg.dependencies || {};
   if (!pkg.dependencies.zod) {
-    pkg.dependencies.zod = "^3.23.8";
+    pkg.dependencies.zod = resolveWorkspaceDependencyVersion(repoRoot, "zod") || "^3.23.8";
     writePackageJson(pkgPath, pkg);
     return "Added zod dependency to domain package";
   }

@@ -2,87 +2,16 @@
 
 const fs = require("fs");
 const path = require("path");
-const ts = require("typescript");
 const { toPascalCase } = require("./casing.cjs");
 const { appendImportsIfMissing } = require("./module-wire-ast.cjs");
 const { findImportModuleForIdentifier } = require("./scan-infrastructure-port-implementations.cjs");
-
-/**
- * @param {ts.SourceFile} sf
- * @returns {ts.ClassDeclaration | undefined}
- */
-function findInfrastructureProviderClass(sf) {
-  /** @type {ts.ClassDeclaration | undefined} */
-  let found;
-  for (const stmt of sf.statements) {
-    if (
-      !ts.isClassDeclaration(stmt) ||
-      !stmt.name ||
-      !stmt.name.text.endsWith("InfrastructureProvider")
-    ) {
-      continue;
-    }
-    if (found) {
-      throw new Error(
-        `Multiple *InfrastructureProvider classes in ${sf.fileName}; expected exactly one.`
-      );
-    }
-    found = stmt;
-  }
-  return found;
-}
-
-/**
- * @param {ts.ClassDeclaration} classDecl
- * @returns {ts.MethodDeclaration | undefined}
- */
-function findGetForContextMethod(classDecl) {
-  for (const member of classDecl.members) {
-    if (!ts.isMethodDeclaration(member)) continue;
-    if (member.name && ts.isIdentifier(member.name) && member.name.text === "getForContext") {
-      return member;
-    }
-  }
-  return undefined;
-}
-
-/**
- * @param {ts.Block} body
- * @returns {{ retStmt: ts.ReturnStatement, obj: ts.ObjectLiteralExpression }}
- */
-function findReturnObjectLiteral(body) {
-  /** @type {ts.ReturnStatement | undefined} */
-  let ret;
-  for (const st of body.statements) {
-    if (ts.isReturnStatement(st)) ret = st;
-  }
-  if (!ret?.expression || !ts.isObjectLiteralExpression(ret.expression)) {
-    throw new Error(
-      "Expected getForContext to end with `return { ... }` (single object literal return)."
-    );
-  }
-  return { retStmt: ret, obj: ret.expression };
-}
-
-/**
- * @param {ts.ClassElement[]} members
- * @param {string} propName
- * @param {string} getterName
- */
-function assertNoConflictingMembers(members, propName, getterName) {
-  for (const m of members) {
-    const n =
-      ts.isMethodDeclaration(m) || ts.isPropertyDeclaration(m) || ts.isGetAccessorDeclaration(m);
-    if (!n || !m.name || !ts.isIdentifier(m.name)) continue;
-    const t = m.name.text;
-    if (t === propName) {
-      throw new Error(`Class already has a member named "${propName}".`);
-    }
-    if (t === getterName) {
-      throw new Error(`Class already has a member named "${getterName}".`);
-    }
-  }
-}
+const {
+  ts,
+  assertNoConflictingMembers,
+  assertNoReturnPropertyConflict,
+  loadCompositionInfrastructureAst,
+  printUpdatedCompositionInfrastructure,
+} = require("./composition-infra-ast.cjs");
 
 /**
  * @param {string} adapterFileAbsPath
@@ -224,39 +153,11 @@ function wirePortAdapterIntoCompositionInfrastructure(compositionInfrastructureP
 
   let text = fs.readFileSync(compositionInfrastructurePath, "utf8");
   text = appendImportsIfMissing(text, [portTypeImportLine, adapterImportLine]);
-
-  const sf = ts.createSourceFile(
-    compositionInfrastructurePath,
-    text,
-    ts.ScriptTarget.Latest,
-    true,
-    ts.ScriptKind.TS
-  );
-
-  const providerClass = findInfrastructureProviderClass(sf);
-  if (!providerClass || !providerClass.name) {
-    throw new Error(
-      `No exported *InfrastructureProvider class in ${compositionInfrastructurePath}`
-    );
-  }
-
-  const getForContext = findGetForContextMethod(providerClass);
-  if (!getForContext?.body || !ts.isBlock(getForContext.body)) {
-    throw new Error(`getForContext must have a block body in ${compositionInfrastructurePath}`);
-  }
-
-  const ctxParam = getForContext.parameters[0];
-  const ctxParamName = ctxParam && ts.isIdentifier(ctxParam.name) ? ctxParam.name.text : "ctx";
-
+  fs.writeFileSync(compositionInfrastructurePath, text, "utf8");
+  const ast = loadCompositionInfrastructureAst(compositionInfrastructurePath);
   const getterName = `get${toPascalCase(propName)}`;
-  assertNoConflictingMembers(providerClass.members, propName, getterName);
-
-  const { retStmt, obj } = findReturnObjectLiteral(getForContext.body);
-  for (const p of obj.properties) {
-    if (ts.isPropertyAssignment(p) && ts.isIdentifier(p.name) && p.name.text === propName) {
-      throw new Error(`getForContext return object already has property "${propName}"`);
-    }
-  }
+  assertNoConflictingMembers(ast.providerClass.members, [propName, getterName]);
+  assertNoReturnPropertyConflict(ast.returnObject, propName);
 
   /** @type {ts.ClassElement} */
   let insertedMember;
@@ -278,7 +179,7 @@ function wirePortAdapterIntoCompositionInfrastructure(compositionInfrastructureP
     const needsStub = requiredConstructorParams > 0;
     insertedMember = createPrivateGetterMethod(
       getterName,
-      ctxParamName,
+      ast.ctxParamName,
       portInterfaceName,
       adapterClassName,
       needsStub
@@ -289,72 +190,18 @@ function wirePortAdapterIntoCompositionInfrastructure(compositionInfrastructureP
         ts.factory.createIdentifier(getterName)
       ),
       undefined,
-      [ts.factory.createIdentifier(ctxParamName)]
+      [ts.factory.createIdentifier(ast.ctxParamName)]
     );
   }
 
-  const newPropAssign = ts.factory.createPropertyAssignment(
-    ts.factory.createIdentifier(propName),
-    valueExprForReturn
-  );
-  const newObj = ts.factory.updateObjectLiteralExpression(obj, [...obj.properties, newPropAssign]);
-  const newRet = ts.factory.updateReturnStatement(retStmt, newObj);
-  const retIndex = getForContext.body.statements.indexOf(retStmt);
-  const newBodyStmts = getForContext.body.statements.map((s, i) => (i === retIndex ? newRet : s));
-  const newGetForContextBody = ts.factory.updateBlock(getForContext.body, newBodyStmts);
-
-  const getForIdx = providerClass.members.indexOf(getForContext);
-  if (getForIdx === -1) {
-    throw new Error("Internal error: getForContext not found in class members array");
-  }
-  const newMembers = [
-    ...providerClass.members.slice(0, getForIdx),
-    insertedMember,
-    ...providerClass.members.slice(getForIdx),
-  ];
-  const newGetForContext = ts.factory.updateMethodDeclaration(
-    getForContext,
-    getForContext.modifiers,
-    getForContext.asteriskToken,
-    getForContext.name,
-    getForContext.questionToken,
-    getForContext.typeParameters,
-    getForContext.parameters,
-    getForContext.type,
-    newGetForContextBody
-  );
-  const newMembers2 = newMembers.map((m) => (m === getForContext ? newGetForContext : m));
-
-  const newClass = ts.factory.updateClassDeclaration(
-    providerClass,
-    providerClass.modifiers,
-    providerClass.name,
-    providerClass.typeParameters,
-    providerClass.heritageClauses,
-    newMembers2
-  );
-
-  const newStatements = sf.statements.map((s) => (s === providerClass ? newClass : s));
-
-  const transformer = (context) => (sourceFile) => {
-    function visit(node) {
-      if (node === sf) {
-        return context.factory.updateSourceFile(sourceFile, newStatements);
-      }
-      return ts.visitEachChild(node, visit, context);
-    }
-    return visit(sourceFile);
-  };
-
-  const result = ts.transform(sf, [transformer]);
-  const transformed = result.transformed[0];
-  result.dispose();
-
-  const printer = ts.createPrinter({
-    newLine: ts.NewLineKind.LineFeed,
-    removeComments: false,
+  return printUpdatedCompositionInfrastructure({
+    ...ast,
+    insertedMembers: [insertedMember],
+    appendedProperty: ts.factory.createPropertyAssignment(
+      ts.factory.createIdentifier(propName),
+      valueExprForReturn
+    ),
   });
-  return `${printer.printFile(transformed).replace(/\n+$/, "")}\n`;
 }
 
 /**

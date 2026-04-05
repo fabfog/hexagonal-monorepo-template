@@ -1,8 +1,17 @@
 import { describe, it, expect } from "vitest";
-import DataLoader from "dataloader";
-import { createDataLoaderRegistry } from "./index";
+import { DataLoader, createDataLoaderRegistry } from "./index";
 
 describe("createDataLoaderRegistry", () => {
+  it("is intended as the default request-scoped registry", () => {
+    const registry = createDataLoaderRegistry();
+    const loader = registry.getOrCreate(
+      "request-default",
+      () => new DataLoader<string, string>(async (ids) => ids.map((id) => id))
+    );
+
+    expect(loader).toBeInstanceOf(DataLoader);
+  });
+
   it("returns same loader instance for the same key", () => {
     const registry = createDataLoaderRegistry();
     const factory = () => new DataLoader<string, string>(async (ids) => ids.map((id) => id));

@@ -162,15 +162,10 @@ function buildMethodBodies(
 
   if (usesBatchFetch) {
     const fetchBlock = useKyHttpClient
-      ? `    const correlationId = this.deps.getCorrelationId();
-
-    const raw = await this.deps.httpClient
-      // FIXME replace with real fetch details
+      ? `    const raw = await this.deps.httpClient
+      // FIXME replace with real fetch details (HTTP context should be applied by composition / lib-http).
       .post("${entityKebab}", {
         json: { ids },
-        headers: {
-          "x-correlation-id": correlationId,
-        },
       })
       .json<unknown>();
 `
@@ -241,8 +236,10 @@ function buildRepositorySource(p) {
   const idVoImport = usesVoIdOnPort
     ? `import type { ${entityPascal}Id } from "@domain/${domainPackage}/value-objects";\n`
     : "";
-  const kyImport = useKyHttpClient ? `import type { KyInstance } from "ky";\n` : "";
-  const depsHttpClient = useKyHttpClient ? `      httpClient: KyInstance;\n` : "";
+  const httpImport = useKyHttpClient
+    ? `import type { HttpClient } from "@infrastructure/lib-http";\n`
+    : "";
+  const depsHttpClient = useKyHttpClient ? `      httpClient: HttpClient;\n` : "";
 
   const batchKind = getBatchGetByIdKind(methods, entityClassName, entityPascal);
   const byIdHandleType =
@@ -253,8 +250,8 @@ function buildRepositorySource(p) {
         : "";
 
   const infraImports = usesBatchFetch
-    ? `import DataLoader from "dataloader";
-import {
+    ? `import {
+  DataLoader,
   createIdleDataLoader,
   type DataLoaderRegistry,
   type IdleDataLoaderHandle,
@@ -279,31 +276,23 @@ import {
     ? `  constructor(
     private readonly deps: {
 ${depsHttpClient}      loaders: DataLoaderRegistry;
-      getCorrelationId: () => string;
-      /**
-       * Optional: clear the by-id DataLoader cache after this many ms without a getById call
-       * (long-lived client registries). Omit on server unless you want this behaviour.
-       */
-      dataLoaderIdleMs?: number;
     }
   ) {
     this.byIdLoader = createIdleDataLoader({
-      registry: deps.loaders,
+      registry: this.deps.loaders,
       loaderKey: BY_ID_LOADER_KEY,
       factory: () => this.createByIdLoader(),
-      idleMs: deps.dataLoaderIdleMs,
     });
   }
 `
     : `  constructor(
     private readonly deps: {
 ${depsHttpClient}      loaders: DataLoaderRegistry;
-      getCorrelationId: () => string;
     }
   ) {}
 `;
 
-  return `${infraImports}${kyImport ? `${kyImport}\n` : ""}import type { ${interfaceName} } from "@application/${applicationPackage}/ports";
+  return `${infraImports}${httpImport ? `${httpImport}\n` : ""}import type { ${interfaceName} } from "@application/${applicationPackage}/ports";
 import type { ${entityClassName} } from "@domain/${domainPackage}/entities";
 ${idVoImport}${notFoundImport}
 ${byIdLoaderKeyConst}export class ${className} implements ${interfaceName} {
@@ -315,7 +304,7 @@ ${byIdLoaderField}${constructorBlock}${methodBodies}}
 module.exports = function registerDrivenRepositoryAddRepositoryGenerator(plop) {
   plop.setGenerator("driven-repository-add-repository", {
     description:
-      "Add a repository (createIdleDataLoader + optional Ky) implementing an application port to a driven-repository-* package",
+      "Add a repository (DataLoader registry + optional HTTP client) implementing an application port to a driven-repository-* package",
     prompts: [
       {
         type: "list",
@@ -356,7 +345,7 @@ module.exports = function registerDrivenRepositoryAddRepositoryGenerator(plop) {
         name: "useKyHttpClient",
         default: true,
         message:
-          "Include Ky HTTP client (`httpClient`) in generated code? Choose No if you will use an external SDK instead (e.g. Contentful):",
+          "Include shared HTTP client (`httpClient`) in generated code? Choose No if you will use an external SDK instead (e.g. Contentful):",
       },
       {
         type: "input",
@@ -496,8 +485,7 @@ module.exports = function registerDrivenRepositoryAddRepositoryGenerator(plop) {
             [`@application/${applicationPackage}`]: "workspace:*",
             [`@domain/${domainPackage}`]: "workspace:*",
             "@infrastructure/lib-dataloader": "workspace:*",
-            dataloader: "^2.2.2",
-            ...(useKy ? { ky: "^1.14.0" } : {}),
+            ...(useKy ? { "@infrastructure/lib-http": "workspace:*" } : {}),
           };
 
           for (const [name, spec] of Object.entries(deps)) {

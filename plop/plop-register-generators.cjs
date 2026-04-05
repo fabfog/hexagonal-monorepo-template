@@ -24,6 +24,8 @@ const registerInfrastructureRawToDomainEntityMapperGenerator = require("./genera
 
 const registerCompositionPackageGenerator = require("./generators/composition-package.cjs");
 const registerCompositionWireModuleGenerator = require("./generators/composition-wire-module.cjs");
+const registerCompositionWireHttpClientGenerator = require("./generators/composition-wire-http-client.cjs");
+const registerCompositionWireDataLoaderRegistryGenerator = require("./generators/composition-wire-dataloader-registry.cjs");
 const registerCompositionWirePortAdapterGenerator = require("./generators/composition-wire-port-adapter.cjs");
 const registerUiPackageGenerator = require("./generators/ui-package.cjs");
 
@@ -65,6 +67,8 @@ function registerGeneratorsForLayers(plop, includedLayers) {
   if (includedLayers.includes("Composition")) {
     registerCompositionPackageGenerator(plop);
     registerCompositionWireModuleGenerator(plop);
+    registerCompositionWireHttpClientGenerator(plop);
+    registerCompositionWireDataLoaderRegistryGenerator(plop);
     registerCompositionWirePortAdapterGenerator(plop);
   }
 

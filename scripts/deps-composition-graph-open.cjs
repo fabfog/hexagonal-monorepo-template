@@ -1,8 +1,12 @@
 #!/usr/bin/env node
 /**
- * Composition wiring graph: apps → @composition/* → @application/* → modules → use-cases & flows
- * → domain entities/services (path / import heuristics; see scripts/lib/composition-wiring-graph.cjs).
- * Writes Mermaid + JSON + vis-network interactive HTML; optional Graphviz SVG when `dot` is installed.
+ * Composition wiring graph (overview): apps → @composition/* → @application/* → `src/modules/*.module.ts` only.
+ * Use `pnpm deps:graph:module` for per-module drill-down (use-cases, flows, domain). See
+ * scripts/lib/composition-wiring-graph.cjs.
+ * Writes Mermaid HTML (static diagram), `.mmd`, `.dot`, JSON snapshot; optional Graphviz SVG when `dot` is installed.
+ *
+ * Flags: pass `--full` to include use-cases, flows, imported ports, and domain (dense graph). Example:
+ *   pnpm deps:graph:composition -- --full
  */
 const fs = require("fs");
 const path = require("path");
@@ -12,19 +16,22 @@ const {
   toWiringMermaid,
   toWiringGraphJson,
   wiringMermaidToHtml,
-  wiringInteractiveVisHtml,
 } = require("./lib/composition-wiring-graph.cjs");
 
 const repoRoot = path.join(__dirname, "..");
 const outDir = path.join(repoRoot, "depcruiser-reports");
 const htmlOut = path.join(outDir, "composition-wiring.html");
-const interactiveOut = path.join(outDir, "composition-wiring-interactive.html");
 const jsonOut = path.join(outDir, "composition-wiring.json");
 const mmdOut = path.join(outDir, "composition-wiring.mmd");
 
 fs.mkdirSync(outDir, { recursive: true });
 
-const { nodes, edges } = buildCompositionWiringGraph(repoRoot);
+const cliArgs = process.argv.slice(2);
+const expandModules = cliArgs.includes("--full");
+const { nodes, edges } = buildCompositionWiringGraph(repoRoot, { expandModules });
+if (expandModules) {
+  console.log("[deps:graph:composition] --full — including use-cases, flows, ports, domain");
+}
 
 let mermaid;
 if (nodes.size === 0) {
@@ -38,11 +45,17 @@ if (nodes.size === 0) {
 }
 
 fs.writeFileSync(mmdOut, `${mermaid}\n`, "utf8");
-fs.writeFileSync(htmlOut, wiringMermaidToHtml(mermaid), "utf8");
+fs.writeFileSync(
+  htmlOut,
+  wiringMermaidToHtml(mermaid, {
+    title: "Composition wiring (overview)",
+    heading: "Composition wiring (apps → composition → application → modules)",
+  }),
+  "utf8"
+);
 
 const wiringPayload = toWiringGraphJson(nodes, edges);
 fs.writeFileSync(jsonOut, `${JSON.stringify(wiringPayload, null, 2)}\n`, "utf8");
-fs.writeFileSync(interactiveOut, wiringInteractiveVisHtml(wiringPayload), "utf8");
 
 const dotLines = [
   'strict digraph "composition_wiring" {',
@@ -59,6 +72,7 @@ const kindFill = {
   module: "#fff9c4",
   useCase: "#b3e5fc",
   flow: "#ffccbc",
+  port: "#d1c4e9",
   domainEntity: "#90caf9",
   domainService: "#64b5f6",
 };
@@ -91,7 +105,7 @@ if (dotSvg.status === 0) {
   console.log('[deps:graph:composition] skip composition-wiring.svg (install graphviz "dot")');
 }
 
-const absInteractive = path.resolve(interactiveOut);
+const absHtml = path.resolve(htmlOut);
 
 function openInBrowser(filePath) {
   if (process.platform === "darwin") {
@@ -103,10 +117,10 @@ function openInBrowser(filePath) {
   }
 }
 
-openInBrowser(absInteractive);
+openInBrowser(absHtml);
 console.log(
-  `[deps:graph:composition] ${nodes.size} nodes, ${edges.length} edges → opened ${path.relative(repoRoot, interactiveOut)}`
+  `[deps:graph:composition] ${nodes.size} nodes, ${edges.length} edges → opened ${path.relative(repoRoot, htmlOut)} (Mermaid)`
 );
 console.log(
-  `[deps:graph:composition] also: ${path.relative(repoRoot, jsonOut)}, ${path.relative(repoRoot, htmlOut)} (Mermaid), ${path.relative(repoRoot, mmdOut)}`
+  `[deps:graph:composition] also: ${path.relative(repoRoot, jsonOut)}, ${path.relative(repoRoot, mmdOut)}, ${path.relative(repoRoot, dotOut)}`
 );

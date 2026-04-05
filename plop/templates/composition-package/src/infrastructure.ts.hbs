@@ -12,7 +12,8 @@ import type { RequestContext } from "./types";
  * **Request-scoped dependencies** (must vary per HTTP request / correlation / tenant):
  * - Do not cache them on `this` as long-lived singletons. Instead, add methods that take
  *   `RequestContext` and return a fresh or context-bound instance, e.g.
- *   `getTicketRepository(ctx: RequestContext) { return new SqlTicketRepository(..., ctx); }`
+ *   `getHttpClient(ctx: RequestContext)`, `getLoaders(ctx)`, or
+ *   `getTicketRepository(ctx: RequestContext) { return new SqlTicketRepository(...); }`
  *
  * **`getForContext(ctx)`** should assemble the slice your modules need by combining
  * app-scoped ports (from your private getters / fields) with request-scoped ones (by calling

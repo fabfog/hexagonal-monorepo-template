@@ -16,7 +16,7 @@ const LAYER_COLORS = {
 };
 
 /**
- * Hierarchical rank for vis-network (UD: smaller = top, LR: smaller = left).
+ * Hierarchical rank for portable JSON snapshots (smaller = higher in overview layout).
  * apps → composition → application → domain → infrastructure (ui shares the outer tier with apps).
  * @param {string} layer e.g. app, ui, composition, application, domain, infrastructure
  * @returns {number}
@@ -81,6 +81,35 @@ function aggregatePackageGraph(cruiseJson, repoRoot) {
   }
 
   return { nodes, edges };
+}
+
+/**
+ * Ensure workspace package nodes exist even if they currently have no discovered edges.
+ * Useful for keeping selected layers visible in the package graph.
+ * @param {string} repoRoot
+ * @param {Map<string, PkgNode>} nodes
+ * @param {{ layers?: string[] }} [options]
+ */
+function mergeWorkspacePackageNodes(repoRoot, nodes, options = {}) {
+  const packagesRoot = path.join(repoRoot, "packages");
+  if (!fs.existsSync(packagesRoot)) return;
+
+  const allowedLayers = options.layers ? new Set(options.layers) : null;
+
+  for (const layer of fs.readdirSync(packagesRoot, { withFileTypes: true })) {
+    if (!layer.isDirectory()) continue;
+    const layerName = layer.name;
+    if (allowedLayers && !allowedLayers.has(layerName)) continue;
+    const layerDir = path.join(packagesRoot, layerName);
+    for (const pkg of fs.readdirSync(layerDir, { withFileTypes: true })) {
+      if (!pkg.isDirectory()) continue;
+      const pkgName = pkg.name;
+      const pkgJsonPath = path.join(layerDir, pkgName, "package.json");
+      if (!fs.existsSync(pkgJsonPath)) continue;
+      const id = `${layerName}/${pkgName}`;
+      nodes.set(id, { id, layer: layerName, label: `${layerName}\n${pkgName}` });
+    }
+  }
 }
 
 /**
@@ -273,7 +302,7 @@ function toMermaid(nodes, edges) {
 }
 
 /**
- * Portable snapshot for vis-network / other tools.
+ * Portable graph snapshot (e.g. for tooling or future viewers).
  * @param {Map<string, PkgNode>} nodes
  * @param {Set<string>} edges keys "fromId->toId"
  * @returns {{ nodes: Array<{ id: string, label: string, layer: string, level: number }>, edges: Array<{ from: string, to: string }> }}
@@ -297,240 +326,6 @@ function toPackageGraphJson(nodes, edges) {
     })
     .filter((e) => e.from && e.to);
   return { nodes: nodeList, edges: edgeList };
-}
-
-/**
- * Self-contained HTML: vis-network + embedded JSON (works from file://).
- * @param {{ nodes: Array<{ id: string, label: string, layer: string, level?: number }>, edges: Array<{ from: string, to: string }> }} payload
- * @returns {string}
- */
-function packageGraphInteractiveVisHtml(payload) {
-  const layerColorsJson = JSON.stringify(LAYER_COLORS).replace(/</g, "\\u003c");
-  const dataJson = JSON.stringify(payload).replace(/</g, "\\u003c");
-
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Package dependency graph (interactive)</title>
-  <script src="https://cdn.jsdelivr.net/npm/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
-  <style>
-    * { box-sizing: border-box; }
-    body { font-family: system-ui, sans-serif; margin: 0; background: #f5f5f5; color: #263238; }
-    header { padding: 0.75rem 1rem; background: #fff; border-bottom: 1px solid #e0e0e0; }
-    h1 { font-size: 1rem; margin: 0 0 0.35rem; }
-    .hint { font-size: 0.8rem; color: #546e7a; max-width: 48rem; line-height: 1.4; margin: 0; }
-    #graph { width: 100%; height: calc(100vh - 6.5rem); background: #fafafa; }
-    .toolbar { padding: 0.35rem 1rem; background: #eee; font-size: 0.8rem; color: #455a64; display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem 0.75rem; }
-    .toolbar button {
-      padding: 0.25rem 0.6rem;
-      font-size: 0.8rem;
-      cursor: pointer;
-      border: 1px solid #b0bec5;
-      border-radius: 4px;
-      background: #fff;
-    }
-    .toolbar button:hover { background: #eceff1; }
-    .toolbar-group { display: inline-flex; align-items: center; gap: 0.25rem; flex-wrap: wrap; }
-    .toolbar-group .tb-label { color: #546e7a; white-space: nowrap; }
-    .toolbar-group .tb-val { min-width: 2.25rem; text-align: center; font-variant-numeric: tabular-nums; color: #263238; }
-    .toolbar-sep { color: #b0bec5; user-select: none; }
-  </style>
-</head>
-<body>
-  <header>
-    <h1>Package dependency graph — interactive (vis-network)</h1>
-    <p class="hint">Nodes: <code>apps/&lt;name&gt;</code> and <code>packages/&lt;layer&gt;/&lt;name&gt;</code>. Hierarchical ranks: apps / ui → composition → application → domain → infrastructure. Use <strong>Level gap</strong> / <strong>Sibling gap</strong> ± to tune spacing (values are remembered separately for top–bottom vs left–right). Same data as <code>packages-graph.json</code>.</p>
-  </header>
-  <div class="toolbar">
-    <button type="button" id="btn-fit">Fit view</button>
-    <button type="button" id="btn-tb">Top → bottom</button>
-    <button type="button" id="btn-lr">Left → right</button>
-    <span class="toolbar-sep" aria-hidden="true">|</span>
-    <span class="toolbar-group" title="Top–bottom: vertical gap between ranks. Left–right: horizontal gap between columns.">
-      <span class="tb-label">Level gap</span>
-      <button type="button" id="btn-level-minus" aria-label="Decrease level gap">−</button>
-      <span class="tb-val" id="val-level-gap">—</span>
-      <button type="button" id="btn-level-plus" aria-label="Increase level gap">+</button>
-    </span>
-    <span class="toolbar-group" title="Top–bottom: horizontal gap on same rank. Left–right: vertical gap between siblings.">
-      <span class="tb-label">Sibling gap</span>
-      <button type="button" id="btn-node-minus" aria-label="Decrease sibling gap">−</button>
-      <span class="tb-val" id="val-node-gap">—</span>
-      <button type="button" id="btn-node-plus" aria-label="Increase sibling gap">+</button>
-    </span>
-  </div>
-  <div id="graph"></div>
-  <script>
-    (function () {
-      var LAYER_COLORS = ${layerColorsJson};
-      var LAYER_LEVEL = { app: 0, ui: 0, composition: 1, application: 2, domain: 3, infrastructure: 4 };
-      var payload = ${dataJson};
-      var visNodes = new vis.DataSet(
-        payload.nodes.map(function (n) {
-          var bg = LAYER_COLORS[n.layer] || LAYER_COLORS.default;
-          var level =
-            typeof n.level === "number"
-              ? n.level
-              : LAYER_LEVEL[n.layer] !== undefined
-                ? LAYER_LEVEL[n.layer]
-                : 3;
-          return {
-            id: n.id,
-            label: n.label,
-            level: level,
-            color: { background: bg, border: "#37474f", highlight: { background: bg, border: "#111" } },
-            shape: "box",
-            margin: 12,
-            font: { color: "#111111", multi: true, size: 13 },
-            widthConstraint: { maximum: 260 },
-          };
-        })
-      );
-      var visEdges = new vis.DataSet(
-        payload.edges.map(function (e, i) {
-          return { id: "e" + i, from: e.from, to: e.to, arrows: "to" };
-        })
-      );
-      var container = document.getElementById("graph");
-      var GAP_STEP = 15;
-      var GAP_LIMITS = { levelMin: 45, levelMax: 520, nodeMin: 45, nodeMax: 480 };
-      function clampGap(n, lo, hi) {
-        return Math.max(lo, Math.min(hi, n));
-      }
-      /** Per-direction spacing (px); UD vs LR keep separate presets so toggling does not lose tweaks. */
-      var spacingPresets = {
-        UD: { levelSeparation: 105, nodeSpacing: 210, treeSpacing: 150 },
-        LR: { levelSeparation: 175, nodeSpacing: 100, treeSpacing: 230 },
-      };
-      var activeLayoutKey = "UD";
-      function currentSpacing() {
-        return spacingPresets[activeLayoutKey];
-      }
-      function visDirection() {
-        return activeLayoutKey === "LR" ? "LR" : "UD";
-      }
-      function isLRLayout() {
-        return activeLayoutKey === "LR";
-      }
-      function buildHierarchicalNetworkOptions() {
-        var dir = visDirection();
-        var isLR = isLRLayout();
-        var s = currentSpacing();
-        return {
-          layout: {
-            hierarchical: {
-              enabled: true,
-              direction: dir,
-              sortMethod: "directed",
-              nodeSpacing: s.nodeSpacing,
-              levelSeparation: s.levelSeparation,
-              treeSpacing: s.treeSpacing,
-              blockShifting: true,
-              edgeMinimization: true,
-              parentCentralization: true,
-              shakeTowards: "roots",
-            },
-          },
-          physics: false,
-          edges: {
-            color: { color: "#78909c", highlight: "#37474f" },
-            smooth: {
-              type: "cubicBezier",
-              roundness: 0.35,
-              forceDirection: isLR ? "horizontal" : "vertical",
-            },
-          },
-        };
-      }
-      function refreshGapLabels() {
-        var s = currentSpacing();
-        var elL = document.getElementById("val-level-gap");
-        var elN = document.getElementById("val-node-gap");
-        if (elL) elL.textContent = String(s.levelSeparation);
-        if (elN) elN.textContent = String(s.nodeSpacing);
-      }
-      function applyHierarchicalLayout(fitAnim) {
-        if (!payload.nodes.length) return;
-        network.setOptions(buildHierarchicalNetworkOptions());
-        refreshGapLabels();
-        fitAfterLayout(fitAnim);
-      }
-      var options = {
-        nodes: { borderWidth: 1, shadow: false, widthConstraint: { maximum: 260 } },
-        interaction: { dragNodes: true, dragView: true, zoomView: true, multiselect: false },
-      };
-      if (payload.nodes.length) {
-        Object.assign(options, buildHierarchicalNetworkOptions());
-      } else {
-        options.physics = false;
-        options.edges = { color: { color: "#78909c", highlight: "#37474f" } };
-      }
-      var network = new vis.Network(container, { nodes: visNodes, edges: visEdges }, options);
-      function fitAfterLayout(animate) {
-        var called = false;
-        function once() {
-          if (called) return;
-          called = true;
-          network.fit({
-            animation: animate ? { duration: 220, easingFunction: "easeInOutQuad" } : false,
-          });
-        }
-        network.once("stabilizationEnd", once);
-        setTimeout(once, 400);
-      }
-      function setLayoutKey(key) {
-        activeLayoutKey = key === "LR" ? "LR" : "UD";
-        applyHierarchicalLayout(false);
-      }
-      function wireGapButtons() {
-        document.getElementById("btn-level-minus").addEventListener("click", function () {
-          var s = currentSpacing();
-          s.levelSeparation = clampGap(s.levelSeparation - GAP_STEP, GAP_LIMITS.levelMin, GAP_LIMITS.levelMax);
-          applyHierarchicalLayout(false);
-        });
-        document.getElementById("btn-level-plus").addEventListener("click", function () {
-          var s = currentSpacing();
-          s.levelSeparation = clampGap(s.levelSeparation + GAP_STEP, GAP_LIMITS.levelMin, GAP_LIMITS.levelMax);
-          applyHierarchicalLayout(false);
-        });
-        document.getElementById("btn-node-minus").addEventListener("click", function () {
-          var s = currentSpacing();
-          s.nodeSpacing = clampGap(s.nodeSpacing - GAP_STEP, GAP_LIMITS.nodeMin, GAP_LIMITS.nodeMax);
-          applyHierarchicalLayout(false);
-        });
-        document.getElementById("btn-node-plus").addEventListener("click", function () {
-          var s = currentSpacing();
-          s.nodeSpacing = clampGap(s.nodeSpacing + GAP_STEP, GAP_LIMITS.nodeMin, GAP_LIMITS.nodeMax);
-          applyHierarchicalLayout(false);
-        });
-      }
-      if (payload.nodes.length) {
-        refreshGapLabels();
-        fitAfterLayout(true);
-        document.getElementById("btn-tb").addEventListener("click", function () {
-          setLayoutKey("UD");
-        });
-        document.getElementById("btn-lr").addEventListener("click", function () {
-          setLayoutKey("LR");
-        });
-        wireGapButtons();
-      } else {
-        document.getElementById("btn-tb").disabled = true;
-        document.getElementById("btn-lr").disabled = true;
-        document.getElementById("btn-level-minus").disabled = true;
-        document.getElementById("btn-level-plus").disabled = true;
-        document.getElementById("btn-node-minus").disabled = true;
-        document.getElementById("btn-node-plus").disabled = true;
-      }
-      document.getElementById("btn-fit").addEventListener("click", function () {
-        network.fit({ animation: { duration: 280, easingFunction: "easeInOutQuad" } });
-      });
-    })();
-  </script>
-</body>
-</html>`;
 }
 
 /**
@@ -566,6 +361,7 @@ function mermaidToHtml(mermaidSource) {
 
 module.exports = {
   aggregatePackageGraph,
+  mergeWorkspacePackageNodes,
   mergeWorkspaceManifestEdges,
   mergeAppWorkspaceEdges,
   packageFromFilePath,
@@ -573,7 +369,6 @@ module.exports = {
   toMermaid,
   toPackageGraphJson,
   mermaidToHtml,
-  packageGraphInteractiveVisHtml,
   hierarchicalLevelForLayer,
   LAYER_COLORS,
 };

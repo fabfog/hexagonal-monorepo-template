@@ -4,13 +4,14 @@ const fs = require("fs");
 const path = require("path");
 
 /**
- * Graph: apps → composition → application → modules → use-cases / flows → domain entities & services
+ * Composition overview (`buildCompositionWiringGraph` default): apps → composition → application → modules.
+ * Per-module drill-down: `buildApplicationModuleWiringGraph` → use-cases / flows → domain entities & services
  * → entity refs from each wired domain service file (path / import-string heuristics only, no metadata).
  */
 
-/** @typedef {"app" | "composition" | "application" | "module" | "useCase" | "flow" | "domainEntity" | "domainService"} NodeKind */
+/** @typedef {"app" | "composition" | "application" | "module" | "useCase" | "flow" | "port" | "domainEntity" | "domainService"} NodeKind */
 
-/** @typedef {{ id: string, kind: NodeKind, label: string }} WiringNode */
+/** @typedef {{ id: string, kind: NodeKind, label: string, pathFromRepo?: string }} WiringNode */
 
 /** @typedef {{ from: string, to: string }} WiringEdge */
 
@@ -29,12 +30,13 @@ const KIND_COLORS = {
   module: "#fff9c4",
   useCase: "#b3e5fc",
   flow: "#ffccbc",
+  port: "#d1c4e9",
   domainEntity: "#90caf9",
   domainService: "#64b5f6",
 };
 
 /**
- * vis-network hierarchical levels: app → composition → application → module → use-case/flow → domain (service then entity).
+ * Hierarchical rank for portable JSON snapshots (smaller = higher in overview layout).
  * @param {NodeKind} kind
  * @returns {number}
  */
@@ -51,10 +53,35 @@ function hierarchicalLevelForKind(kind) {
     case "useCase":
     case "flow":
       return 4;
-    case "domainService":
+    case "port":
       return 5;
-    case "domainEntity":
+    case "domainService":
       return 6;
+    case "domainEntity":
+      return 7;
+    default:
+      return 0;
+  }
+}
+
+/**
+ * Levels for {@link buildApplicationModuleWiringGraph} (module as root → slices → domain).
+ * @param {NodeKind} kind
+ * @returns {number}
+ */
+function hierarchicalLevelForModuleDetailRoot(kind) {
+  switch (kind) {
+    case "module":
+      return 0;
+    case "useCase":
+    case "flow":
+      return 1;
+    case "port":
+      return 2;
+    case "domainService":
+      return 3;
+    case "domainEntity":
+      return 4;
     default:
       return 0;
   }
@@ -354,6 +381,38 @@ function extractDomainEntityAndServiceRefs(source, repoRoot, onRef) {
 }
 
 /**
+ * @param {string} source
+ * @param {string} appPkg
+ * @param {(portName: string, label: string) => void} onPortRef
+ */
+function extractApplicationPortRefs(source, appPkg, onPortRef) {
+  const cleaned = stripTsCommentsApprox(source);
+  const patterns = [
+    new RegExp(
+      String.raw`import\s+(?:type\s+)?\{([^}]*)\}\s+from\s+["']@application\/${appPkg.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\/ports["']\s*;`,
+      "g"
+    ),
+    /import\s+(?:type\s+)?\{([^}]*)\}\s+from\s+["']\.\.\/ports\/([a-z0-9-]+)(?:\.[a-z0-9-]+\.port)?["']\s*;/g,
+    /import\s+(?:type\s+)?(\w+)\s+from\s+["']\.\.\/ports\/([a-z0-9-]+)(?:\.[a-z0-9-]+\.port)?["']\s*;/g,
+  ];
+
+  let m;
+  while ((m = patterns[0].exec(cleaned)) !== null) {
+    for (const id of parseNamedImportIdentifiers(m[1])) {
+      onPortRef(id, `@application/${appPkg}/ports\n${id}`);
+    }
+  }
+  while ((m = patterns[1].exec(cleaned)) !== null) {
+    for (const id of parseNamedImportIdentifiers(m[1])) {
+      onPortRef(id, `../ports → ${id}`);
+    }
+  }
+  while ((m = patterns[2].exec(cleaned)) !== null) {
+    onPortRef(m[1], `../ports → ${m[1]}`);
+  }
+}
+
+/**
  * Entity imports relative to `packages/domain/<domainPkg>/src/services/*.service.ts` (e.g. `../entities`).
  * @param {string} source
  * @param {string} repoRoot
@@ -520,6 +579,7 @@ function mermaidSafeId(s) {
  * @param {string} consumerId
  * @param {(id: string, kind: NodeKind, label: string) => void} addNode
  * @param {WiringEdge[]} edges
+ * @param {string} appPkg
  * @param {Map<string, { domainPkg: string, className: string }> | null} [domainServiceRegistry]
  */
 function wireConsumerToDomain(
@@ -528,10 +588,16 @@ function wireConsumerToDomain(
   consumerId,
   addNode,
   edges,
+  appPkg,
   domainServiceRegistry
 ) {
   if (!fs.existsSync(absPath)) return;
   const text = fs.readFileSync(absPath, "utf8");
+  extractApplicationPortRefs(text, appPkg, (portName, label) => {
+    const nid = `p_${mermaidSafeId(appPkg)}_${mermaidSafeId(portName)}`;
+    addNode(nid, "port", label);
+    edges.push({ from: consumerId, to: nid });
+  });
   extractDomainEntityAndServiceRefs(text, repoRoot, (kind, domainPkg, className, label) => {
     const prefix = kind === "domainEntity" ? "de" : "ds";
     const nid = `${prefix}_${mermaidSafeId(domainPkg)}_${mermaidSafeId(className)}`;
@@ -582,14 +648,30 @@ function appendAppToCompositionEdges(repoRoot, nodes, edges, addNode, compositio
   }
 }
 
-function buildCompositionWiringGraph(repoRoot) {
+/**
+ * @param {string} repoRoot
+ * @param {{ expandModules?: boolean }} [options] If `expandModules` is true, include use-cases, flows, and domain (full graph). Default **false**: stop at application modules for a readable overview. The CLI enables this with `pnpm deps:graph:composition -- --full`.
+ */
+function buildCompositionWiringGraph(repoRoot, options = {}) {
+  const expandModules = options.expandModules === true;
+
   /** @type {Map<string, WiringNode>} */
   const nodes = new Map();
   /** @type {WiringEdge[]} */
   const edges = [];
 
-  function addNode(id, kind, label) {
-    if (!nodes.has(id)) nodes.set(id, { id, kind, label });
+  /**
+   * @param {string} id
+   * @param {NodeKind} kind
+   * @param {string} label
+   * @param {string} [pathFromRepo] posix path from repo root (e.g. module `*.module.ts` for vis click → deps:graph:module)
+   */
+  function addNode(id, kind, label, pathFromRepo) {
+    if (nodes.has(id)) return;
+    /** @type {WiringNode} */
+    const n = { id, kind, label };
+    if (pathFromRepo) n.pathFromRepo = pathFromRepo;
+    nodes.set(id, n);
   }
 
   const compositionRoot = path.join(repoRoot, "packages", "composition");
@@ -605,6 +687,9 @@ function buildCompositionWiringGraph(repoRoot) {
     .sort();
 
   const compositionFolderNames = new Set(compDirs);
+
+  /** Application node ids (`a_*`) for which module edges (and optional expand) already ran — avoids duplicate arcs when several `@composition/*` packages import the same app. */
+  const applicationModulesWired = new Set();
 
   /** @type {Map<string, { domainPkg: string, className: string }>} */
   const domainServiceRegistry = new Map();
@@ -628,6 +713,9 @@ function buildCompositionWiringGraph(repoRoot) {
       addNode(aid, "application", `@application/${appName}`);
       edges.push({ from: cid, to: aid });
 
+      if (applicationModulesWired.has(aid)) continue;
+      applicationModulesWired.add(aid);
+
       const modulesDir = path.join(repoRoot, "packages", "application", appName, "src", "modules");
       if (!fs.existsSync(modulesDir)) continue;
 
@@ -640,8 +728,11 @@ function buildCompositionWiringGraph(repoRoot) {
       for (const mf of moduleFiles) {
         const base = mf.replace(/\.module\.ts$/, "");
         const mid = `m_${mermaidSafeId(appName)}_${mermaidSafeId(base)}`;
-        addNode(mid, "module", `${appName}/${base}.module`);
+        const pathFromRepo = ["packages", "application", appName, "src", "modules", mf].join("/");
+        addNode(mid, "module", `${appName}/${base}.module`, pathFromRepo);
         edges.push({ from: aid, to: mid });
+
+        if (!expandModules) continue;
 
         const absMod = path.join(modulesDir, mf);
         const content = fs.readFileSync(absMod, "utf8");
@@ -661,7 +752,15 @@ function buildCompositionWiringGraph(repoRoot) {
           const uid = `uc_${mermaidSafeId(appName)}_${mermaidSafeId(uc)}`;
           addNode(uid, "useCase", `${uc}.use-case`);
           edges.push({ from: mid, to: uid });
-          wireConsumerToDomain(repoRoot, ucPath, uid, addNode, edges, domainServiceRegistry);
+          wireConsumerToDomain(
+            repoRoot,
+            ucPath,
+            uid,
+            addNode,
+            edges,
+            appName,
+            domainServiceRegistry
+          );
         }
         for (const fl of flows) {
           const flPath = path.join(
@@ -677,17 +776,164 @@ function buildCompositionWiringGraph(repoRoot) {
           const fid = `fl_${mermaidSafeId(appName)}_${mermaidSafeId(fl)}`;
           addNode(fid, "flow", `${fl}.flow`);
           edges.push({ from: mid, to: fid });
-          wireConsumerToDomain(repoRoot, flPath, fid, addNode, edges, domainServiceRegistry);
+          wireConsumerToDomain(
+            repoRoot,
+            flPath,
+            fid,
+            addNode,
+            edges,
+            appName,
+            domainServiceRegistry
+          );
         }
       }
     }
   }
 
-  for (const [serviceId, { domainPkg, className }] of domainServiceRegistry) {
-    wireDomainServiceToDomainEntities(repoRoot, serviceId, domainPkg, className, addNode, edges);
+  if (expandModules) {
+    for (const [serviceId, { domainPkg, className }] of domainServiceRegistry) {
+      wireDomainServiceToDomainEntities(repoRoot, serviceId, domainPkg, className, addNode, edges);
+    }
   }
 
   appendAppToCompositionEdges(repoRoot, nodes, edges, addNode, compositionFolderNames);
+
+  return { nodes, edges };
+}
+
+/**
+ * Resolve a CLI argument to an application `*.module.ts` under the repo.
+ * Accepts a repo-relative or absolute path, or the same label as the composition graph:
+ * `<application-folder>/<kebab>.module` or `<application-folder>/<kebab>.module.ts`.
+ * @param {string} repoRoot
+ * @param {string} userArg
+ * @returns {string | null} absolute normalized path
+ */
+function resolveApplicationModuleFileArg(repoRoot, userArg) {
+  if (userArg == null || !String(userArg).trim()) return null;
+  const raw = String(userArg).trim().replace(/\\/g, "/");
+  if (!raw.includes("..")) {
+    const short = raw.match(/^([^/]+)\/([a-z0-9-]+)\.module(?:\.ts)?$/);
+    if (short) {
+      const appFolder = short[1];
+      const kebab = short[2];
+      const candidate = path.normalize(
+        path.join(
+          repoRoot,
+          "packages",
+          "application",
+          appFolder,
+          "src",
+          "modules",
+          `${kebab}.module.ts`
+        )
+      );
+      if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
+        const rel = path.relative(repoRoot, candidate).replace(/\\/g, "/");
+        if (!rel.startsWith("..") && !path.isAbsolute(rel)) {
+          if (rel.match(/^packages\/application\/[^/]+\/src\/modules\/[a-z0-9-]+\.module\.ts$/)) {
+            return candidate;
+          }
+        }
+      }
+    }
+  }
+
+  const abs = path.isAbsolute(raw) ? path.normalize(raw) : path.normalize(path.join(repoRoot, raw));
+  if (!abs.endsWith(".module.ts")) return null;
+  const rel = path.relative(repoRoot, abs);
+  if (rel.startsWith("..") || path.isAbsolute(rel)) return null;
+  if (!fs.existsSync(abs) || !fs.statSync(abs).isFile()) return null;
+  if (
+    !rel
+      .replace(/\\/g, "/")
+      .match(/^packages\/application\/[^/]+\/src\/modules\/[a-z0-9-]+\.module\.ts$/)
+  ) {
+    return null;
+  }
+  return abs;
+}
+
+/**
+ * Drill-down graph for one `*.module.ts`: module → wired use-cases & flows → domain (same heuristics as full composition graph).
+ * @param {string} repoRoot
+ * @param {string} moduleAbsPath absolute path to `packages/application/<pkg>/src/modules/<kebab>.module.ts`
+ * @returns {{ nodes: Map<string, WiringNode>, edges: WiringEdge[] }}
+ */
+function buildApplicationModuleWiringGraph(repoRoot, moduleAbsPath) {
+  /** @type {Map<string, WiringNode>} */
+  const nodes = new Map();
+  /** @type {WiringEdge[]} */
+  const edges = [];
+
+  /**
+   * @param {string} id
+   * @param {NodeKind} kind
+   * @param {string} label
+   * @param {string} [pathFromRepo]
+   */
+  function addNode(id, kind, label, pathFromRepo) {
+    if (nodes.has(id)) return;
+    /** @type {WiringNode} */
+    const n = { id, kind, label };
+    if (pathFromRepo) n.pathFromRepo = pathFromRepo;
+    nodes.set(id, n);
+  }
+
+  const rel = path.relative(repoRoot, moduleAbsPath).replace(/\\/g, "/");
+  const m = rel.match(/^packages\/application\/([^/]+)\/src\/modules\/([a-z0-9-]+)\.module\.ts$/);
+  if (!m) {
+    throw new Error(
+      `Expected packages/application/<app>/src/modules/<kebab>.module.ts, got: ${rel}`
+    );
+  }
+  const appName = m[1];
+  const base = m[2];
+  const mid = `m_${mermaidSafeId(appName)}_${mermaidSafeId(base)}`;
+  addNode(mid, "module", `${appName}/${base}.module`, rel);
+
+  const content = fs.readFileSync(moduleAbsPath, "utf8");
+  const { useCases, flows } = extractWiredSlicesFromModuleSource(content);
+
+  /** @type {Map<string, { domainPkg: string, className: string }>} */
+  const domainServiceRegistry = new Map();
+
+  for (const uc of useCases) {
+    const ucPath = path.join(
+      repoRoot,
+      "packages",
+      "application",
+      appName,
+      "src",
+      "use-cases",
+      `${uc}.use-case.ts`
+    );
+    if (!fs.existsSync(ucPath)) continue;
+    const uid = `uc_${mermaidSafeId(appName)}_${mermaidSafeId(uc)}`;
+    addNode(uid, "useCase", `${uc}.use-case`);
+    edges.push({ from: mid, to: uid });
+    wireConsumerToDomain(repoRoot, ucPath, uid, addNode, edges, appName, domainServiceRegistry);
+  }
+  for (const fl of flows) {
+    const flPath = path.join(
+      repoRoot,
+      "packages",
+      "application",
+      appName,
+      "src",
+      "flows",
+      `${fl}.flow.ts`
+    );
+    if (!fs.existsSync(flPath)) continue;
+    const fid = `fl_${mermaidSafeId(appName)}_${mermaidSafeId(fl)}`;
+    addNode(fid, "flow", `${fl}.flow`);
+    edges.push({ from: mid, to: fid });
+    wireConsumerToDomain(repoRoot, flPath, fid, addNode, edges, appName, domainServiceRegistry);
+  }
+
+  for (const [serviceId, { domainPkg, className }] of domainServiceRegistry) {
+    wireDomainServiceToDomainEntities(repoRoot, serviceId, domainPkg, className, addNode, edges);
+  }
 
   return { nodes, edges };
 }
@@ -719,285 +965,55 @@ function toWiringMermaid(nodes, edges) {
 }
 
 /**
- * Portable graph snapshot (e.g. for vis-network, Cytoscape, or other tools).
+ * Portable graph snapshot (e.g. for tooling or future viewers).
  * @param {Map<string, WiringNode>} nodes
  * @param {WiringEdge[]} edges
- * @returns {{ nodes: Array<{ id: string, label: string, kind: NodeKind, level: number }>, edges: Array<{ from: string, to: string }> }}
+ * @param {(kind: NodeKind) => number} [levelForKind] defaults to {@link hierarchicalLevelForKind}
+ * @returns {{ nodes: Array<{ id: string, label: string, kind: NodeKind, level: number, pathFromRepo?: string }>, edges: Array<{ from: string, to: string }> }}
  */
-function toWiringGraphJson(nodes, edges) {
+function toWiringGraphJson(nodes, edges, levelForKind = hierarchicalLevelForKind) {
   const nodeList = [...nodes.values()]
     .sort((a, b) => a.id.localeCompare(b.id))
-    .map((n) => ({
-      id: n.id,
-      label: n.label,
-      kind: n.kind,
-      level: hierarchicalLevelForKind(n.kind),
-    }));
+    .map((n) => {
+      /** @type {{ id: string, label: string, kind: NodeKind, level: number, pathFromRepo?: string }} */
+      const o = {
+        id: n.id,
+        label: n.label,
+        kind: n.kind,
+        level: levelForKind(n.kind),
+      };
+      if (n.pathFromRepo) o.pathFromRepo = n.pathFromRepo;
+      return o;
+    });
   const edgeList = edges.map((e) => ({ from: e.from, to: e.to }));
   return { nodes: nodeList, edges: edgeList };
 }
 
-/**
- * Self-contained HTML: vis-network + embedded JSON (works from file://).
- * @param {{ nodes: Array<{ id: string, label: string, kind: NodeKind, level?: number }>, edges: Array<{ from: string, to: string }> }} payload
- * @returns {string}
- */
-function wiringInteractiveVisHtml(payload) {
-  const kindColorsJson = JSON.stringify(KIND_COLORS).replace(/</g, "\\u003c");
-  const dataJson = JSON.stringify(payload).replace(/</g, "\\u003c");
+const DEFAULT_COMPOSITION_MERMAID_HINT = `Derived from file paths and import strings only (no extra metadata). <strong>Overview</strong> stops at <code>*.module.ts</code> unless you re-run with <code>pnpm deps:graph:composition -- --full</code> (use-cases, flows, ports, domain). For drill-down run <code>pnpm deps:graph:module -- …</code> with the repo path to the file or the same label as a module node (<code>&lt;app-folder&gt;/&lt;kebab&gt;.module</code>). <strong>Apps</strong>: <code>apps/&lt;name&gt;/src/**/*.{ts,tsx}</code> referencing <code>@composition/&lt;pkg&gt;</code>. <strong>Composition → application</strong>: scan composition <code>src</code> for <code>@application/&lt;pkg&gt;/…</code>. <strong>Application → modules</strong>: one node per <code>src/modules/*.module.ts</code>.`;
 
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Composition wiring (interactive)</title>
-  <script src="https://cdn.jsdelivr.net/npm/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
-  <style>
-    * { box-sizing: border-box; }
-    body { font-family: system-ui, sans-serif; margin: 0; background: #f5f5f5; color: #263238; }
-    header { padding: 0.75rem 1rem; background: #fff; border-bottom: 1px solid #e0e0e0; }
-    h1 { font-size: 1rem; margin: 0 0 0.35rem; }
-    .hint { font-size: 0.8rem; color: #546e7a; max-width: 48rem; line-height: 1.4; margin: 0; }
-    #graph { width: 100%; height: calc(100vh - 6.5rem); background: #fafafa; }
-    .toolbar { padding: 0.35rem 1rem; background: #eee; font-size: 0.8rem; color: #455a64; display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem 0.75rem; }
-    .toolbar button {
-      padding: 0.25rem 0.6rem;
-      font-size: 0.8rem;
-      cursor: pointer;
-      border: 1px solid #b0bec5;
-      border-radius: 4px;
-      background: #fff;
-    }
-    .toolbar button:hover { background: #eceff1; }
-    .toolbar-group { display: inline-flex; align-items: center; gap: 0.25rem; flex-wrap: wrap; }
-    .toolbar-group .tb-label { color: #546e7a; white-space: nowrap; }
-    .toolbar-group .tb-val { min-width: 2.25rem; text-align: center; font-variant-numeric: tabular-nums; color: #263238; }
-    .toolbar-sep { color: #b0bec5; user-select: none; }
-  </style>
-</head>
-<body>
-  <header>
-    <h1>Composition wiring — interactive (vis-network)</h1>
-    <p class="hint">Hierarchical layout: app → composition → application → module → use-case/flow → domain (service, then entity). Toggle top–bottom vs left–right; <strong>Level gap</strong> / <strong>Sibling gap</strong> ± adjust spacing (separate presets per orientation). Pan and zoom on the canvas. Same data as <code>composition-wiring.json</code>.</p>
-  </header>
-  <div class="toolbar">
-    <button type="button" id="btn-fit">Fit view</button>
-    <button type="button" id="btn-tb">Top → bottom</button>
-    <button type="button" id="btn-lr">Left → right</button>
-    <span class="toolbar-sep" aria-hidden="true">|</span>
-    <span class="toolbar-group" title="Top–bottom: vertical gap between ranks. Left–right: horizontal gap between columns.">
-      <span class="tb-label">Level gap</span>
-      <button type="button" id="btn-level-minus" aria-label="Decrease level gap">−</button>
-      <span class="tb-val" id="val-level-gap">—</span>
-      <button type="button" id="btn-level-plus" aria-label="Increase level gap">+</button>
-    </span>
-    <span class="toolbar-group" title="Top–bottom: horizontal gap on same rank. Left–right: vertical gap between siblings.">
-      <span class="tb-label">Sibling gap</span>
-      <button type="button" id="btn-node-minus" aria-label="Decrease sibling gap">−</button>
-      <span class="tb-val" id="val-node-gap">—</span>
-      <button type="button" id="btn-node-plus" aria-label="Increase sibling gap">+</button>
-    </span>
-  </div>
-  <div id="graph"></div>
-  <script>
-    (function () {
-      var KIND_COLORS = ${kindColorsJson};
-      var payload = ${dataJson};
-      var visNodes;
-      var visEdges;
-      if (!payload.nodes.length) {
-        visNodes = new vis.DataSet([
-          {
-            id: "_empty",
-            label: "No graph yet\\nAdd packages under packages/composition",
-            color: { background: "#e1bee7", border: "#37474f" },
-            shape: "box",
-            margin: 16,
-            font: { color: "#111", size: 14 },
-          },
-        ]);
-        visEdges = new vis.DataSet([]);
-      } else {
-        visNodes = new vis.DataSet(
-          payload.nodes.map(function (n) {
-            var bg = KIND_COLORS[n.kind] || "#eceff1";
-            var level =
-              typeof n.level === "number"
-                ? n.level
-                : ({ app: 0, composition: 1, application: 2, module: 3, useCase: 4, flow: 4, domainService: 5, domainEntity: 6 }[
-                    n.kind
-                  ] ?? 0);
-            return {
-              id: n.id,
-              label: n.label,
-              level: level,
-              color: { background: bg, border: "#37474f", highlight: { background: bg, border: "#111" } },
-              shape: "box",
-              margin: 12,
-              font: { color: "#111111", multi: true, size: 13 },
-              widthConstraint: { maximum: 260 },
-            };
-          })
-        );
-        visEdges = new vis.DataSet(
-          payload.edges.map(function (e, i) {
-            return { id: "e" + i, from: e.from, to: e.to, arrows: "to" };
-          })
-        );
-      }
-      var container = document.getElementById("graph");
-      var GAP_STEP = 15;
-      var GAP_LIMITS = { levelMin: 45, levelMax: 520, nodeMin: 45, nodeMax: 480 };
-      function clampGap(n, lo, hi) {
-        return Math.max(lo, Math.min(hi, n));
-      }
-      var spacingPresets = {
-        UD: { levelSeparation: 105, nodeSpacing: 210, treeSpacing: 150 },
-        LR: { levelSeparation: 175, nodeSpacing: 100, treeSpacing: 230 },
-      };
-      var activeLayoutKey = "UD";
-      function currentSpacing() {
-        return spacingPresets[activeLayoutKey];
-      }
-      function visDirection() {
-        return activeLayoutKey === "LR" ? "LR" : "UD";
-      }
-      function isLRLayout() {
-        return activeLayoutKey === "LR";
-      }
-      function buildHierarchicalNetworkOptions() {
-        var dir = visDirection();
-        var isLR = isLRLayout();
-        var s = currentSpacing();
-        return {
-          layout: {
-            hierarchical: {
-              enabled: true,
-              direction: dir,
-              sortMethod: "directed",
-              nodeSpacing: s.nodeSpacing,
-              levelSeparation: s.levelSeparation,
-              treeSpacing: s.treeSpacing,
-              blockShifting: true,
-              edgeMinimization: true,
-              parentCentralization: true,
-              shakeTowards: "roots",
-            },
-          },
-          physics: false,
-          edges: {
-            color: { color: "#78909c", highlight: "#37474f" },
-            smooth: {
-              type: "cubicBezier",
-              roundness: 0.35,
-              forceDirection: isLR ? "horizontal" : "vertical",
-            },
-          },
-        };
-      }
-      function refreshGapLabels() {
-        var s = currentSpacing();
-        var elL = document.getElementById("val-level-gap");
-        var elN = document.getElementById("val-node-gap");
-        if (elL) elL.textContent = String(s.levelSeparation);
-        if (elN) elN.textContent = String(s.nodeSpacing);
-      }
-      function applyHierarchicalLayout(fitAnim) {
-        if (!payload.nodes.length) return;
-        network.setOptions(buildHierarchicalNetworkOptions());
-        refreshGapLabels();
-        fitAfterLayout(fitAnim);
-      }
-      var options = {
-        nodes: { borderWidth: 1, shadow: false, widthConstraint: { maximum: 260 } },
-        interaction: { dragNodes: true, dragView: true, zoomView: true, multiselect: false },
-      };
-      if (payload.nodes.length) {
-        Object.assign(options, buildHierarchicalNetworkOptions());
-      } else {
-        options.physics = false;
-      }
-      var network = new vis.Network(container, { nodes: visNodes, edges: visEdges }, options);
-      function fitAfterLayout(animate) {
-        var called = false;
-        function once() {
-          if (called) return;
-          called = true;
-          network.fit({
-            animation: animate
-              ? { duration: 220, easingFunction: "easeInOutQuad" }
-              : false,
-          });
-        }
-        network.once("stabilizationEnd", once);
-        setTimeout(once, 400);
-      }
-      function setLayoutKey(key) {
-        activeLayoutKey = key === "LR" ? "LR" : "UD";
-        applyHierarchicalLayout(false);
-      }
-      function wireGapButtons() {
-        document.getElementById("btn-level-minus").addEventListener("click", function () {
-          var s = currentSpacing();
-          s.levelSeparation = clampGap(s.levelSeparation - GAP_STEP, GAP_LIMITS.levelMin, GAP_LIMITS.levelMax);
-          applyHierarchicalLayout(false);
-        });
-        document.getElementById("btn-level-plus").addEventListener("click", function () {
-          var s = currentSpacing();
-          s.levelSeparation = clampGap(s.levelSeparation + GAP_STEP, GAP_LIMITS.levelMin, GAP_LIMITS.levelMax);
-          applyHierarchicalLayout(false);
-        });
-        document.getElementById("btn-node-minus").addEventListener("click", function () {
-          var s = currentSpacing();
-          s.nodeSpacing = clampGap(s.nodeSpacing - GAP_STEP, GAP_LIMITS.nodeMin, GAP_LIMITS.nodeMax);
-          applyHierarchicalLayout(false);
-        });
-        document.getElementById("btn-node-plus").addEventListener("click", function () {
-          var s = currentSpacing();
-          s.nodeSpacing = clampGap(s.nodeSpacing + GAP_STEP, GAP_LIMITS.nodeMin, GAP_LIMITS.nodeMax);
-          applyHierarchicalLayout(false);
-        });
-      }
-      if (payload.nodes.length) {
-        refreshGapLabels();
-        fitAfterLayout(true);
-        document.getElementById("btn-tb").addEventListener("click", function () {
-          setLayoutKey("UD");
-        });
-        document.getElementById("btn-lr").addEventListener("click", function () {
-          setLayoutKey("LR");
-        });
-        wireGapButtons();
-      } else {
-        document.getElementById("btn-tb").disabled = true;
-        document.getElementById("btn-lr").disabled = true;
-        document.getElementById("btn-level-minus").disabled = true;
-        document.getElementById("btn-level-plus").disabled = true;
-        document.getElementById("btn-node-minus").disabled = true;
-        document.getElementById("btn-node-plus").disabled = true;
-      }
-      document.getElementById("btn-fit").addEventListener("click", function () {
-        network.fit({ animation: { duration: 280, easingFunction: "easeInOutQuad" } });
-      });
-    })();
-  </script>
-</body>
-</html>`;
+/**
+ * @param {string} s
+ */
+function escapeHtmlText(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 /**
  * @param {string} mermaidSource
+ * @param {{ title?: string, heading?: string, hint?: string }} [meta]
  * @returns {string}
  */
-function wiringMermaidToHtml(mermaidSource) {
+function wiringMermaidToHtml(mermaidSource, meta = {}) {
   const safe = mermaidSource.replace(/&/g, "&amp;");
+  const title = meta.title ?? "Composition wiring graph";
+  const heading = meta.heading ?? "Composition wiring (apps → composition → application → modules)";
+  const hint = meta.hint ?? DEFAULT_COMPOSITION_MERMAID_HINT;
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Composition wiring graph</title>
+  <title>${escapeHtmlText(title)}</title>
   <script type="module">
     import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
     mermaid.initialize({ startOnLoad: true, securityLevel: "loose", theme: "neutral" });
@@ -1010,8 +1026,8 @@ function wiringMermaidToHtml(mermaidSource) {
   </style>
 </head>
 <body>
-  <h1>Composition wiring (apps, application, domain)</h1>
-  <p class="hint">Derived from file paths and import strings only (no extra metadata). <strong>Apps</strong>: <code>apps/&lt;name&gt;/src/**/*.{ts,tsx}</code> referencing <code>@composition/&lt;pkg&gt;</code> (existing composition packages only). <strong>Composition → application</strong>: scan composition <code>src</code> for <code>@application/&lt;pkg&gt;/…</code>. <strong>Modules</strong> and <strong>use-case / flow</strong> wiring unchanged. <strong>Domain</strong>: from each <code>*.use-case.ts</code> and <code>*.flow.ts</code>, parse <code>@domain/&lt;pkg&gt;/entities</code> and <code>…/services</code> (barrel or subpath); edges only if the matching <code>.entity.ts</code> / <code>.service.ts</code> exists. <strong>Domain service → entity</strong>: for each domain service reached from a use-case/flow, parse the same <code>@domain/…/entities</code> patterns plus <code>../entities</code> relatives from that <code>.service.ts</code>. <strong>Domain nodes</strong> are labeled with the <strong>PascalCase</strong> class name (import symbol for barrels; first <code>export class</code> in the slice file for subpath, with a kebab→Pascal fallback if needed).</p>
+  <h1>${escapeHtmlText(heading)}</h1>
+  <p class="hint">${hint}</p>
   <pre class="mermaid">${safe}</pre>
 </body>
 </html>`;
@@ -1019,11 +1035,13 @@ function wiringMermaidToHtml(mermaidSource) {
 
 module.exports = {
   buildCompositionWiringGraph,
+  buildApplicationModuleWiringGraph,
+  resolveApplicationModuleFileArg,
   toWiringMermaid,
   toWiringGraphJson,
   wiringMermaidToHtml,
-  wiringInteractiveVisHtml,
   hierarchicalLevelForKind,
+  hierarchicalLevelForModuleDetailRoot,
   KIND_COLORS,
   walkTsFiles,
   extractApplicationPackageNames,

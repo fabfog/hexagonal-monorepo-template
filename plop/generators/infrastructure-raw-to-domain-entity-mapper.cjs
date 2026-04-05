@@ -6,6 +6,7 @@ const {
   toPlopChoices,
   getDomainEntityChoices,
   getInfrastructurePackageChoices,
+  resolveWorkspaceDependencyVersion,
 } = require("../lib");
 
 const repoRoot = getRepoRoot();
@@ -140,7 +141,8 @@ describe('map${rawNamePascal}To${entityClassName}', () => {
 
           pkg.devDependencies = pkg.devDependencies || {};
           if (!pkg.devDependencies.vitest) {
-            pkg.devDependencies.vitest = "^4.1.0";
+            pkg.devDependencies.vitest =
+              resolveWorkspaceDependencyVersion(repoRoot, "vitest") || "^4.1.0";
           }
           pkg.scripts = pkg.scripts || {};
           if (!pkg.scripts.test || String(pkg.scripts.test).includes("No tests yet")) {
