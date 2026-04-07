@@ -78,3 +78,35 @@ export function patchPackageJsonWithZodAndExports(
   applyConditionalExportsToPackageJson(pkg, options.exportSubpaths);
   return stringifyPackageJson(pkg);
 }
+
+/**
+ * Ensures `@domain/core` in `dependencies` when missing (workspace protocol).
+ * Matches Plop `ensureDomainCoreDependency` for non-`core` feature packages.
+ */
+export function applyDomainCoreDependencyToPackageJson(pkg: PackageJsonLike): void {
+  pkg.dependencies = pkg.dependencies ?? {};
+  if (!pkg.dependencies["@domain/core"]) {
+    pkg.dependencies["@domain/core"] = "workspace:*";
+  }
+}
+
+export interface PatchPackageJsonZodAndOptionalDomainCoreOptions {
+  zodRange: string;
+  /** When true and `@domain/core` is absent, add `workspace:*`. */
+  ensureDomainCore: boolean;
+}
+
+/**
+ * Ensures `zod` and optionally `@domain/core` without touching `exports`.
+ */
+export function patchPackageJsonZodAndOptionalDomainCore(
+  raw: string,
+  options: PatchPackageJsonZodAndOptionalDomainCoreOptions
+): string {
+  const pkg = JSON.parse(raw) as PackageJsonLike;
+  applyZodDevDependencyToPackageJson(pkg, options.zodRange);
+  if (options.ensureDomainCore) {
+    applyDomainCoreDependencyToPackageJson(pkg);
+  }
+  return stringifyPackageJson(pkg);
+}

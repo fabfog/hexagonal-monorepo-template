@@ -1,6 +1,7 @@
 export type { ApplicationPackageWizardInput } from "./generate/application";
 export { runApplicationMenu, runApplicationPackageWizard } from "./generate/application";
 export type {
+  DomainEntityAddVoFieldWizardInput,
   DomainEntityWizardInput,
   DomainErrorWizardInput,
   DomainPackageWizardInput,
@@ -9,6 +10,7 @@ export type {
 } from "./generate/domain";
 export {
   printNoInteractiveHint,
+  runDomainEntityAddVoFieldWizard,
   runDomainEntityWizard,
   runDomainErrorWizard,
   runDomainMenu,

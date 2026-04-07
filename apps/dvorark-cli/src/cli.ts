@@ -8,6 +8,10 @@ import pc from "picocolors";
 import { runCreateCommand } from "./commands/create.command";
 import { runGenerateApplicationPackageCommand } from "./commands/generate-application-package.command";
 import {
+  printDomainEntityAddVoFieldNoInteractiveHint,
+  runGenerateDomainEntityAddVoFieldCommand,
+} from "./commands/generate-domain-entity-add-vo-field.command";
+import {
   printDomainEntityNoInteractiveHint,
   runGenerateDomainEntityCommand,
 } from "./commands/generate-domain-entity.command";
@@ -28,6 +32,7 @@ import { runGenerateDomainPackageCommand } from "./commands/generate-domain-pack
 import {
   printNoInteractiveHint,
   runApplicationPackageWizard,
+  runDomainEntityAddVoFieldWizard,
   runDomainEntityWizard,
   runDomainErrorWizard,
   runDomainPackageWizard,
@@ -280,6 +285,82 @@ export async function runCli(): Promise<void> {
           domainPackageSlugInput: domainPkg,
           entitySlugInput: entitySlug,
           ...(options.zod !== undefined ? { zodVersionOverride: options.zod } : {}),
+        });
+      }
+    );
+
+  generate
+    .command("domain-entity-add-vo-field")
+    .description(
+      "Add one Zod + VO-backed property to an existing domain entity (re-run for more fields)"
+    )
+    .option(
+      "--domain-package <slug>",
+      "Domain package folder under packages/domain (required in non-interactive mode)"
+    )
+    .option(
+      "--entity <Pascal>",
+      "Entity PascalCase stem (e.g. LineItem); required in non-interactive mode"
+    )
+    .option("--property <name>", "camelCase property name; required in non-interactive mode")
+    .option("--vo-class <Name>", "VO class name (e.g. Email); required in non-interactive mode")
+    .option("--vo-source <source>", "core | local; required in non-interactive mode")
+    .option(
+      "--workspace <dir>",
+      "Monorepo root containing packages/domain (default: current directory)"
+    )
+    .option(
+      "--no-interactive",
+      "Fail if required options are missing (CI; also respects CI / DVORARK_NO_INTERACTIVE)"
+    )
+    .action(
+      async (options: {
+        domainPackage?: string;
+        entity?: string;
+        property?: string;
+        voClass?: string;
+        voSource?: string;
+        workspace?: string;
+        noInteractive?: boolean;
+      }): Promise<void> => {
+        const workspaceRoot = options.workspace
+          ? path.resolve(process.cwd(), options.workspace)
+          : process.cwd();
+        const domainPkg = options.domainPackage?.trim();
+        const entityPascal = options.entity?.trim();
+        const propertyName = options.property?.trim();
+        const voClass = options.voClass?.trim();
+        const voSourceRaw = options.voSource?.trim();
+        const noInteractive = isNonInteractive(argv) || options.noInteractive === true;
+
+        const complete =
+          domainPkg &&
+          entityPascal &&
+          propertyName &&
+          voClass &&
+          (voSourceRaw === "core" || voSourceRaw === "local");
+
+        if (!complete) {
+          if (noInteractive) {
+            printDomainEntityAddVoFieldNoInteractiveHint();
+            process.exit(1);
+          }
+          await runDomainEntityAddVoFieldWizard({
+            ...(options.workspace ? { workspaceRoot } : {}),
+            ...(domainPkg ? { domainPackageSlug: domainPkg } : {}),
+            ...(entityPascal ? { entityPascal } : {}),
+            ...(propertyName ? { propertyName } : {}),
+          });
+          return;
+        }
+
+        await runGenerateDomainEntityAddVoFieldCommand({
+          workspaceRoot,
+          domainPackageSlugInput: domainPkg,
+          entityPascalInput: entityPascal,
+          propertyNameInput: propertyName,
+          voClass,
+          voSource: voSourceRaw,
         });
       }
     );

@@ -19,3 +19,11 @@ export function domainSliceIndexRelativePath(
 ): string {
   return `${domainPackageRootRelative(domainPackageSlug)}/src/${slice}/index.ts`;
 }
+
+/** `packages/domain/<slug>/src/entities/<entityKebabStem>.entity.ts` */
+export function domainEntityFileRelativePath(
+  domainPackageSlug: string,
+  entityKebabStem: string
+): string {
+  return `${domainPackageRootRelative(domainPackageSlug)}/src/entities/${entityKebabStem}.entity.ts`;
+}

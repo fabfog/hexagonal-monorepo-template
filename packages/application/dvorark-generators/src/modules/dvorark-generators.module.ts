@@ -10,6 +10,7 @@ import { CreateDomainErrorUseCase } from "../use-cases/create-domain-error.use-c
 import { CreateDomainServiceUseCase } from "../use-cases/create-domain-service.use-case";
 import { CreateDomainPackageUseCase } from "../use-cases/create-domain-package.use-case";
 import { CreateDomainValueObjectUseCase } from "../use-cases/create-domain-value-object.use-case";
+import { AddDomainEntityVoFieldUseCase } from "../use-cases/add-domain-entity-vo-field.use-case";
 
 export interface DvorarkGeneratorsInfra {
   templateRenderer: TemplateRendererPort;
@@ -74,6 +75,14 @@ export class DvorarkGeneratorsModule {
       workspaceReader: this.infra.workspaceReader,
       workspaceWriter: this.infra.workspaceWriter,
       generatorBlueprintSource: this.infra.generatorBlueprintSource,
+      generatorToolingDefaults: this.infra.generatorToolingDefaults,
+    });
+  }
+
+  addDomainEntityVoField(): AddDomainEntityVoFieldUseCase {
+    return new AddDomainEntityVoFieldUseCase({
+      workspaceReader: this.infra.workspaceReader,
+      workspaceWriter: this.infra.workspaceWriter,
       generatorToolingDefaults: this.infra.generatorToolingDefaults,
     });
   }

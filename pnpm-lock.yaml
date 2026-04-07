@@ -168,6 +168,9 @@ importers:
       case-anything:
         specifier: ^3.1.2
         version: 3.1.2
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
     devDependencies:
       vitest:
         specifier: ^4.1.0

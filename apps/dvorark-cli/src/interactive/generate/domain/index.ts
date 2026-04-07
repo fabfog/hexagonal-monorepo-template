@@ -1,3 +1,5 @@
+export { runDomainEntityAddVoFieldWizard } from "./domain-entity-add-vo-field.wizard";
+export type { DomainEntityAddVoFieldWizardInput } from "./domain-entity-add-vo-field.wizard";
 export { runDomainEntityWizard } from "./domain-entity.wizard";
 export type { DomainEntityWizardInput } from "./domain-entity.wizard";
 export { runDomainValueObjectWizard } from "./domain-value-object.wizard";
