@@ -1,3 +1,5 @@
+import pc from "picocolors";
+
 import { getDvorarkCliModules } from "@composition/dvorark-cli";
 
 export async function runWorkspaceCommand(): Promise<void> {
@@ -9,9 +11,9 @@ export async function runWorkspaceCommand(): Promise<void> {
 
   if (result.status !== "ready") {
     throw new Error(
-      `No Dvorark workspace found in ${cwd}. Run "dvorark create <target-directory>" first.`
+      `${pc.bold("No Dvorark workspace")} in ${pc.dim(cwd)}. Run ${pc.cyan("dvorark create <target-directory>")} first.`
     );
   }
 
-  console.log("[dvorark] Workspace mode is not implemented yet.");
+  console.log(pc.dim("[dvorark] Workspace mode is not implemented yet."));
 }
