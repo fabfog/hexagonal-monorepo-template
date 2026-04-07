@@ -1,7 +1,7 @@
 import path from "node:path";
 
-import { cancel, isCancel, text } from "@clack/prompts";
 import { runGenerateApplicationPackageCommand } from "../../../commands/generate-application-package.command";
+import { promptText } from "../../prompts";
 
 export interface ApplicationPackageWizardInput {
   packageSlug?: string;
@@ -14,45 +14,33 @@ export async function runApplicationPackageWizard(
 ): Promise<void> {
   let packageSlug = partial.packageSlug?.trim();
   if (!packageSlug) {
-    const slugInput = await text({
+    const slugInput = await promptText({
       message: "Package slug or name (e.g. user, UserProfile)",
       placeholder: "user",
       validate: (v) => (!v?.trim() ? "Required" : undefined),
     });
-    if (isCancel(slugInput)) {
-      cancel("Cancelled.");
-      return;
-    }
-    packageSlug = String(slugInput).trim();
+    packageSlug = slugInput.trim();
   }
 
   let workspaceRoot = partial.workspaceRoot;
   if (!workspaceRoot) {
-    const workspaceInput = await text({
+    const workspaceInput = await promptText({
       message: "Monorepo root (contains packages/application)",
       initialValue: process.cwd(),
       validate: (v) => (!v?.trim() ? "Required" : undefined),
     });
-    if (isCancel(workspaceInput)) {
-      cancel("Cancelled.");
-      return;
-    }
-    workspaceRoot = path.resolve(String(workspaceInput).trim());
+    workspaceRoot = path.resolve(workspaceInput.trim());
   } else {
     workspaceRoot = path.resolve(workspaceRoot);
   }
 
   let vitestVersionOverride = partial.vitestVersionOverride;
   if (vitestVersionOverride === undefined) {
-    const vitestInput = await text({
+    const vitestInput = await promptText({
       message: "Vitest version range override (optional, empty = auto)",
       placeholder: "e.g. ^4.1.0",
     });
-    if (isCancel(vitestInput)) {
-      cancel("Cancelled.");
-      return;
-    }
-    const trimmed = String(vitestInput ?? "").trim();
+    const trimmed = vitestInput.trim();
     vitestVersionOverride = trimmed === "" ? undefined : trimmed;
   }
 

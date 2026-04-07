@@ -1,21 +1,15 @@
-import { cancel, isCancel, select } from "@clack/prompts";
-
+import { promptSelect } from "../../prompts";
 import { runDomainPackageWizard } from "./domain-package.wizard";
 
 export async function runDomainMenu(targetDirectory: string): Promise<void> {
   for (;;) {
-    const choice = await select({
+    const choice = await promptSelect({
       message: "Domain",
       options: [
         { value: "domain-package", label: "Domain package" },
         { value: "back", label: "Back" },
       ],
     });
-
-    if (isCancel(choice)) {
-      cancel("Cancelled.");
-      return;
-    }
 
     if (choice === "back") {
       return;

@@ -1,11 +1,10 @@
-import { cancel, isCancel, select } from "@clack/prompts";
-
+import { promptSelect } from "../prompts";
 import { runApplicationMenu } from "./application/menu";
 import { runDomainMenu } from "./domain/menu";
 
 export async function runGenerateMenu(targetDirectory: string): Promise<void> {
   for (;;) {
-    const choice = await select({
+    const choice = await promptSelect({
       message: "Generate",
       options: [
         { value: "domain", label: "Domain" },
@@ -13,11 +12,6 @@ export async function runGenerateMenu(targetDirectory: string): Promise<void> {
         { value: "back", label: "Back" },
       ],
     });
-
-    if (isCancel(choice)) {
-      cancel("Cancelled.");
-      return;
-    }
 
     if (choice === "back") {
       return;

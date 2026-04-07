@@ -1,10 +1,10 @@
 import path from "node:path";
 
-import { cancel, isCancel, select } from "@clack/prompts";
 import pc from "picocolors";
 
 import { getDvorarkCliModules } from "@composition/dvorark-cli";
 
+import { promptSelect } from "./prompts";
 import { runGenerateMenu } from "./generate/menu";
 
 function printBootstrapHint(targetDirectory: string): void {
@@ -33,18 +33,13 @@ export async function runInteractiveMainMenu(targetDirectory: string): Promise<v
   }
 
   for (;;) {
-    const choice = await select({
+    const choice = await promptSelect({
       message: `${pc.bold("Dvorark")} ${pc.dim(`(${target})`)}`,
       options: [
         { value: "generate", label: "Generate" },
         { value: "exit", label: "Exit" },
       ],
     });
-
-    if (isCancel(choice)) {
-      cancel("Bye.");
-      process.exit(0);
-    }
 
     if (choice === "exit") {
       process.exit(0);
