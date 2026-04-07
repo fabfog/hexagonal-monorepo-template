@@ -2,6 +2,7 @@ import type { RequestContext } from "./types";
 import {
   BlueprintSourceAdapter,
   TemplateRendererAdapter,
+  WorkspaceInspectionAdapter,
   WorkspaceInstallAdapter,
   WorkspaceTargetAdapter,
   WorkspaceWriterAdapter,
@@ -33,6 +34,7 @@ class DvorarkCliInfrastructureProvider {
   private readonly workspaceWriter = new WorkspaceWriterAdapter();
   private readonly workspaceInstall = new WorkspaceInstallAdapter();
   private readonly workspaceTarget = new WorkspaceTargetAdapter();
+  private readonly workspaceInspection = new WorkspaceInspectionAdapter();
 
   getForContext(_ctx: RequestContext) {
     return {
@@ -41,6 +43,7 @@ class DvorarkCliInfrastructureProvider {
       workspaceWriter: this.workspaceWriter,
       workspaceInstall: this.workspaceInstall,
       workspaceTarget: this.workspaceTarget,
+      workspaceInspection: this.workspaceInspection,
     };
   }
 }

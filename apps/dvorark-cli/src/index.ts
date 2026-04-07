@@ -1,8 +1,5 @@
 import { runCreateCommand } from "./commands/create.command";
-
-function printUsage(): void {
-  console.log("Usage: dvorark create <target-directory> [--install]");
-}
+import { runWorkspaceCommand } from "./commands/workspace.command";
 
 async function main(): Promise<void> {
   const rawArgs = process.argv.slice(2);
@@ -10,8 +7,7 @@ async function main(): Promise<void> {
   const [command, ...rest] = args;
 
   if (!command) {
-    printUsage();
-    process.exitCode = 1;
+    await runWorkspaceCommand();
     return;
   }
 
@@ -26,5 +22,5 @@ async function main(): Promise<void> {
 main().catch((error: unknown) => {
   const message = error instanceof Error ? error.message : String(error);
   console.error(`[dvorark] ${message}`);
-  process.exit(1);
+  process.exitCode = 1;
 });
