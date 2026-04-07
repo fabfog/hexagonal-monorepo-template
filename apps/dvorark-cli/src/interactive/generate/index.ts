@@ -1,0 +1,1 @@
+export { runGenerateMenu } from "./menu";
