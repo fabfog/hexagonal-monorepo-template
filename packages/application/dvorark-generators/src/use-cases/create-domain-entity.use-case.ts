@@ -16,7 +16,7 @@ import {
   patchPackageJsonWithZodAndExports,
 } from "../common-packages-operations/shared";
 import type { CreateDomainEntityInputDto } from "../dto/create-domain-entity.dto";
-import type { GeneratorBlueprintSourcePort } from "../ports";
+import type { GeneratorBlueprintSourcePort, GeneratorToolingDefaultsPort } from "../ports";
 
 /** Blueprint folder under `blueprints/generators/<id>/`. */
 export const DOMAIN_ENTITY_GENERATOR_ID = "domain-entity" as const;
@@ -26,6 +26,7 @@ export interface CreateDomainEntityUseCaseDependencies {
   workspaceWriter: WorkspaceWriterPort;
   workspaceReader: WorkspaceReaderPort;
   generatorBlueprintSource: GeneratorBlueprintSourcePort;
+  generatorToolingDefaults: GeneratorToolingDefaultsPort;
 }
 
 export interface CreateDomainEntityUseCaseReturn {
@@ -123,9 +124,13 @@ export class CreateDomainEntityUseCase {
     ];
 
     if (existingPkgJson) {
+      const zodRange =
+        input.zodVersionOverride ??
+        (await this.deps.generatorToolingDefaults.zodRange(input.workspaceRoot));
       files.push({
         relativePath: pkgJsonRel,
         contents: patchPackageJsonWithZodAndExports(existingPkgJson, {
+          zodRange,
           exportSubpaths: ["entities", "value-objects"],
         }),
       });

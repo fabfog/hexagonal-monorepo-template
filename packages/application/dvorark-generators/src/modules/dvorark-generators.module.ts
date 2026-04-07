@@ -46,6 +46,7 @@ export class DvorarkGeneratorsModule {
       workspaceReader: this.infra.workspaceReader,
       workspaceWriter: this.infra.workspaceWriter,
       generatorBlueprintSource: this.infra.generatorBlueprintSource,
+      generatorToolingDefaults: this.infra.generatorToolingDefaults,
     });
   }
 
@@ -73,6 +74,7 @@ export class DvorarkGeneratorsModule {
       workspaceReader: this.infra.workspaceReader,
       workspaceWriter: this.infra.workspaceWriter,
       generatorBlueprintSource: this.infra.generatorBlueprintSource,
+      generatorToolingDefaults: this.infra.generatorToolingDefaults,
     });
   }
 }

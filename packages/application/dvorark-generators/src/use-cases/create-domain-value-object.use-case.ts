@@ -19,7 +19,7 @@ import type {
   CreateDomainValueObjectInputDto,
   SingleValuePrimitive,
 } from "../dto/create-domain-value-object.dto";
-import type { GeneratorBlueprintSourcePort } from "../ports";
+import type { GeneratorBlueprintSourcePort, GeneratorToolingDefaultsPort } from "../ports";
 
 /** Blueprint folder under `blueprints/generators/<id>/`. */
 export const DOMAIN_VALUE_OBJECT_GENERATOR_ID = "domain-value-object" as const;
@@ -43,6 +43,7 @@ export interface CreateDomainValueObjectUseCaseDependencies {
   workspaceWriter: WorkspaceWriterPort;
   workspaceReader: WorkspaceReaderPort;
   generatorBlueprintSource: GeneratorBlueprintSourcePort;
+  generatorToolingDefaults: GeneratorToolingDefaultsPort;
 }
 
 export interface CreateDomainValueObjectUseCaseReturn {
@@ -113,9 +114,13 @@ export class CreateDomainValueObjectUseCase {
     ];
 
     if (existingPkgJson) {
+      const zodRange =
+        input.zodVersionOverride ??
+        (await this.deps.generatorToolingDefaults.zodRange(input.workspaceRoot));
       files.push({
         relativePath: pkgJsonRel,
         contents: patchPackageJsonWithZodAndExports(existingPkgJson, {
+          zodRange,
           exportSubpaths: ["value-objects"],
         }),
       });

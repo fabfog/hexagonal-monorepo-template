@@ -16,6 +16,8 @@ export interface GenerateDomainEntityCommandOptions {
   workspaceRoot: string;
   domainPackageSlugInput: string;
   entitySlugInput: string;
+  /** Override zod range when patching domain package.json (default: workspace resolution). */
+  zodVersionOverride?: string;
 }
 
 export function printDomainEntityNoInteractiveHint(): void {
@@ -41,6 +43,9 @@ export async function runGenerateDomainEntityCommand(
       workspaceRoot,
       domainPackageSlugInput: parsed.domainPackageSlugInput,
       entitySlugInput: parsed.entitySlugInput,
+      ...(options.zodVersionOverride !== undefined
+        ? { zodVersionOverride: options.zodVersionOverride.trim() }
+        : {}),
     });
 
     spin.stop(

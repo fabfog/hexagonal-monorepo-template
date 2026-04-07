@@ -240,6 +240,7 @@ export async function runCli(): Promise<void> {
       "--workspace <dir>",
       "Monorepo root containing packages/domain (default: current directory)"
     )
+    .option("--zod <range>", "Override zod semver range when patching domain package.json")
     .option(
       "--no-interactive",
       "Fail if entity slug or domain package is missing (CI; also respects CI / DVORARK_NO_INTERACTIVE)"
@@ -247,7 +248,12 @@ export async function runCli(): Promise<void> {
     .action(
       async (
         entitySlugArg: string | undefined,
-        options: { domainPackage?: string; workspace?: string; noInteractive?: boolean }
+        options: {
+          domainPackage?: string;
+          workspace?: string;
+          zod?: string;
+          noInteractive?: boolean;
+        }
       ): Promise<void> => {
         const workspaceRoot = options.workspace
           ? path.resolve(process.cwd(), options.workspace)
@@ -273,6 +279,7 @@ export async function runCli(): Promise<void> {
           workspaceRoot,
           domainPackageSlugInput: domainPkg,
           entitySlugInput: entitySlug,
+          ...(options.zod !== undefined ? { zodVersionOverride: options.zod } : {}),
         });
       }
     );
@@ -299,6 +306,7 @@ export async function runCli(): Promise<void> {
       "--primitive <type>",
       "For single-value: string | boolean | number | Date (default: string)"
     )
+    .option("--zod <range>", "Override zod semver range when patching domain package.json")
     .option(
       "--no-interactive",
       "Fail if slug or domain package is missing (CI; also respects CI / DVORARK_NO_INTERACTIVE)"
@@ -311,6 +319,7 @@ export async function runCli(): Promise<void> {
           workspace?: string;
           voKind?: string;
           primitive?: string;
+          zod?: string;
           noInteractive?: boolean;
         }
       ): Promise<void> => {
@@ -364,6 +373,7 @@ export async function runCli(): Promise<void> {
           valueObjectSlugInput: voSlug,
           valueObjectKind,
           ...(singleValuePrimitive !== undefined ? { singleValuePrimitive } : {}),
+          ...(options.zod !== undefined ? { zodVersionOverride: options.zod } : {}),
         });
       }
     );

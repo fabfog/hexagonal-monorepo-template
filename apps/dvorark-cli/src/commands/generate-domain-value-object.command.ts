@@ -25,6 +25,7 @@ export interface GenerateDomainValueObjectCommandOptions {
   valueObjectSlugInput: string;
   valueObjectKind: ValueObjectKindCli;
   singleValuePrimitive?: SingleValuePrimitiveCli;
+  zodVersionOverride?: string;
 }
 
 export function printDomainValueObjectNoInteractiveHint(): void {
@@ -57,6 +58,9 @@ export async function runGenerateDomainValueObjectCommand(
       valueObjectSlugInput: parsed.valueObjectSlugInput,
       valueObjectKind: parsed.valueObjectKind,
       ...(singleValuePrimitive !== undefined ? { singleValuePrimitive } : {}),
+      ...(options.zodVersionOverride !== undefined
+        ? { zodVersionOverride: options.zodVersionOverride.trim() }
+        : {}),
     });
 
     spin.stop(

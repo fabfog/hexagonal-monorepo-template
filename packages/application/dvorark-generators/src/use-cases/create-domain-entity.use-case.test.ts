@@ -28,6 +28,10 @@ describe("CreateDomainEntityUseCase", () => {
         return null;
       }),
     };
+    const generatorToolingDefaults = {
+      vitestRange: vi.fn(async () => "^4.1.0"),
+      zodRange: vi.fn(async () => "^3.23.8"),
+    };
     const generatorBlueprintSource = {
       load: vi.fn(async () => [
         {
@@ -53,6 +57,7 @@ describe("CreateDomainEntityUseCase", () => {
       workspaceWriter,
       workspaceReader,
       generatorBlueprintSource,
+      generatorToolingDefaults,
     });
 
     const out = await uc.execute({
@@ -65,6 +70,7 @@ describe("CreateDomainEntityUseCase", () => {
     expect(out.domainPackageSlug).toBe("fixture-codegen-entity");
     expect(out.filesWritten).toBe(6);
     expect(generatorBlueprintSource.load).toHaveBeenCalledWith(DOMAIN_ENTITY_GENERATOR_ID);
+    expect(generatorToolingDefaults.zodRange).toHaveBeenCalledWith("/tmp/ws");
 
     expect(workspaceWriter.writeFiles).toHaveBeenCalledWith(
       "/tmp/ws",

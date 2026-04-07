@@ -1,23 +1,22 @@
 import type { GeneratorToolingDefaultsPort } from "@application/dvorark-generators/ports";
-import fs from "node:fs";
-import path from "node:path";
+import {
+  resolveWorkspaceDependencyRange,
+  type WorkspaceToolingDependencyName,
+} from "../workspace/resolve-workspace-dependency-range";
 
-const FALLBACK_VITEST_RANGE = "^4.1.0";
+async function rangeFor(
+  workspaceRoot: string,
+  dep: WorkspaceToolingDependencyName
+): Promise<string> {
+  return resolveWorkspaceDependencyRange(workspaceRoot, dep);
+}
 
 export class GeneratorToolingDefaultsAdapter implements GeneratorToolingDefaultsPort {
   async vitestRange(workspaceRoot: string): Promise<string> {
-    const pkgPath = path.join(workspaceRoot, "package.json");
-    if (!fs.existsSync(pkgPath)) {
-      return FALLBACK_VITEST_RANGE;
-    }
+    return rangeFor(workspaceRoot, "vitest");
+  }
 
-    const raw = fs.readFileSync(pkgPath, "utf8");
-    const pkg = JSON.parse(raw) as { devDependencies?: Record<string, string> };
-    const v = pkg.devDependencies?.vitest;
-    if (typeof v === "string" && v.trim().length > 0) {
-      return v.trim();
-    }
-
-    return FALLBACK_VITEST_RANGE;
+  async zodRange(workspaceRoot: string): Promise<string> {
+    return rangeFor(workspaceRoot, "zod");
   }
 }

@@ -25,6 +25,7 @@ describe("CreateDomainPackageUseCase", () => {
     };
     const generatorToolingDefaults = {
       vitestRange: vi.fn(async () => "^4.1.0"),
+      zodRange: vi.fn(async () => "^3.23.8"),
     };
 
     const uc = new CreateDomainPackageUseCase({
@@ -64,6 +65,7 @@ describe("CreateDomainPackageUseCase", () => {
     };
     const generatorToolingDefaults = {
       vitestRange: vi.fn(async () => "SHOULD_NOT_USE"),
+      zodRange: vi.fn(async () => "SHOULD_NOT_USE"),
     };
 
     const uc = new CreateDomainPackageUseCase({

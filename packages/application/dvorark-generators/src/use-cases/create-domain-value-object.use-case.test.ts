@@ -25,6 +25,10 @@ describe("CreateDomainValueObjectUseCase", () => {
         return null;
       }),
     };
+    const generatorToolingDefaults = {
+      vitestRange: vi.fn(async () => "^4.1.0"),
+      zodRange: vi.fn(async () => "^3.23.8"),
+    };
     const generatorBlueprintSource = {
       load: vi.fn(async () => [
         {
@@ -45,6 +49,7 @@ describe("CreateDomainValueObjectUseCase", () => {
       workspaceWriter,
       workspaceReader,
       generatorBlueprintSource,
+      generatorToolingDefaults,
     });
 
     const out = await uc.execute({
@@ -97,6 +102,10 @@ describe("CreateDomainValueObjectUseCase", () => {
         return null;
       }),
     };
+    const generatorToolingDefaults = {
+      vitestRange: vi.fn(async () => "^4.1.0"),
+      zodRange: vi.fn(async () => "^3.23.8"),
+    };
     const generatorBlueprintSource = {
       load: vi.fn(async () => [
         {
@@ -117,6 +126,7 @@ describe("CreateDomainValueObjectUseCase", () => {
       workspaceWriter,
       workspaceReader,
       generatorBlueprintSource,
+      generatorToolingDefaults,
     });
 
     await uc.execute({

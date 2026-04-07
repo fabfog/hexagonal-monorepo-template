@@ -8,4 +8,6 @@ export interface CreateDomainEntityInputDto {
   domainPackageSlugInput: string;
   /** Entity name; normalized via `EntitySlug.fromString` in the use case. */
   entitySlugInput: string;
+  /** Optional override for `zod` in patched domain `package.json`; otherwise `GeneratorToolingDefaultsPort.zodRange`. */
+  zodVersionOverride?: string;
 }

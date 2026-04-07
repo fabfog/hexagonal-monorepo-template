@@ -16,4 +16,6 @@ export interface CreateDomainValueObjectInputDto {
   valueObjectKind: ValueObjectKind;
   /** Used when {@link valueObjectKind} is `single-value`; defaults to `string` in the use case. */
   singleValuePrimitive?: SingleValuePrimitive;
+  /** Optional override for `zod` in patched domain `package.json`; otherwise `GeneratorToolingDefaultsPort.zodRange`. */
+  zodVersionOverride?: string;
 }

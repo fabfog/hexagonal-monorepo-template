@@ -1,5 +1,3 @@
-import { DEFAULT_ZOD_DEV_RANGE } from "./constants";
-
 interface PackageJsonLike {
   dependencies?: Record<string, string>;
   exports?: Record<string, string> | unknown[];
@@ -10,12 +8,12 @@ function stringifyPackageJson(pkg: PackageJsonLike): string {
 }
 
 /**
- * Ensures `dependencies.zod` when missing (domain packages generated for Zod-based code).
+ * Ensures `dependencies.zod` when missing, using the provided workspace-resolved range.
  */
-export function applyZodDevDependencyToPackageJson(pkg: PackageJsonLike): void {
+export function applyZodDevDependencyToPackageJson(pkg: PackageJsonLike, zodRange: string): void {
   pkg.dependencies = pkg.dependencies ?? {};
   if (!pkg.dependencies.zod) {
-    pkg.dependencies.zod = DEFAULT_ZOD_DEV_RANGE;
+    pkg.dependencies.zod = zodRange;
   }
 }
 
@@ -55,27 +53,28 @@ export function patchPackageJsonExports(
 }
 
 /**
- * Parses `package.json` text, ensures `zod` dev dependency, stringifies.
+ * Parses `package.json` text, ensures `zod` dependency, stringifies.
  */
-export function patchPackageJsonEnsureZodDependency(raw: string): string {
+export function patchPackageJsonEnsureZodDependency(raw: string, zodRange: string): string {
   const pkg = JSON.parse(raw) as PackageJsonLike;
-  applyZodDevDependencyToPackageJson(pkg);
+  applyZodDevDependencyToPackageJson(pkg, zodRange);
   return stringifyPackageJson(pkg);
 }
 
-export interface PatchPackageJsonWithZodAndExportsOptions {
-  exportSubpaths: readonly string[];
+export interface PatchPackageJsonWithZodAndExportsOptions extends PatchPackageJsonExportsOptions {
+  /** Resolved semver range for `zod` (from workspace or CLI override). */
+  zodRange: string;
 }
 
 /**
- * Ensures `zod` and conditional `exports` in one pass (same as applying both concerns sequentially without double stringify of unrelated fields).
+ * Ensures `zod` and conditional `exports` in one pass.
  */
 export function patchPackageJsonWithZodAndExports(
   raw: string,
   options: PatchPackageJsonWithZodAndExportsOptions
 ): string {
   const pkg = JSON.parse(raw) as PackageJsonLike;
-  applyZodDevDependencyToPackageJson(pkg);
+  applyZodDevDependencyToPackageJson(pkg, options.zodRange);
   applyConditionalExportsToPackageJson(pkg, options.exportSubpaths);
   return stringifyPackageJson(pkg);
 }
