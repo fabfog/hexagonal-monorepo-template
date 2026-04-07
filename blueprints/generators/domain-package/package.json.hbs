@@ -1,0 +1,19 @@
+{
+  "name": "@domain/{{packageSlug}}",
+  "version": "1.0.0",
+  "description": "",
+  "private": true,
+  "type": "module",
+  "exports": {},
+  "scripts": {
+    "lint": "eslint src",
+    "lint:fix": "eslint src --fix",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@domain/core": "workspace:*"
+  },
+  "devDependencies": {
+    "vitest": "{{vitestVersion}}"
+  }
+}

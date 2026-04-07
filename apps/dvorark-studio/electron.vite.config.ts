@@ -8,7 +8,9 @@ export default defineConfig({
         exclude: [
           "@composition/dvorark-studio",
           "@application/dvorark-bootstrap",
+          "@application/dvorark-generators",
           "@infrastructure/driven-dvorark-bootstrap",
+          "@infrastructure/driven-dvorark-generators",
         ],
       }),
     ],

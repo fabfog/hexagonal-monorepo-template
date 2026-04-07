@@ -1,0 +1,20 @@
+{
+  "name": "@infrastructure/driven-dvorark-generators",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint src",
+    "lint:fix": "eslint src --fix",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@application/dvorark-generators": "workspace:*"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.0"
+  }
+}

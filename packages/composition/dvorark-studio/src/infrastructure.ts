@@ -7,6 +7,10 @@ import {
   WorkspaceTargetAdapter,
   WorkspaceWriterAdapter,
 } from "@infrastructure/driven-dvorark-bootstrap";
+import {
+  GeneratorBlueprintSourceAdapter,
+  GeneratorToolingDefaultsAdapter,
+} from "@infrastructure/driven-dvorark-generators";
 
 class DvorarkStudioInfrastructureProvider {
   private readonly blueprintSource = new BlueprintSourceAdapter();
@@ -15,6 +19,8 @@ class DvorarkStudioInfrastructureProvider {
   private readonly workspaceInstall = new WorkspaceInstallAdapter();
   private readonly workspaceTarget = new WorkspaceTargetAdapter();
   private readonly workspaceInspection = new WorkspaceInspectionAdapter();
+  private readonly generatorBlueprintSource = new GeneratorBlueprintSourceAdapter();
+  private readonly generatorToolingDefaults = new GeneratorToolingDefaultsAdapter();
 
   getForContext(_ctx: RequestContext) {
     return {
@@ -24,6 +30,8 @@ class DvorarkStudioInfrastructureProvider {
       workspaceInstall: this.workspaceInstall,
       workspaceTarget: this.workspaceTarget,
       workspaceInspection: this.workspaceInspection,
+      generatorBlueprintSource: this.generatorBlueprintSource,
+      generatorToolingDefaults: this.generatorToolingDefaults,
     };
   }
 }

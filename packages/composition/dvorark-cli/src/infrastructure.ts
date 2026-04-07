@@ -7,6 +7,10 @@ import {
   WorkspaceTargetAdapter,
   WorkspaceWriterAdapter,
 } from "@infrastructure/driven-dvorark-bootstrap";
+import {
+  GeneratorBlueprintSourceAdapter,
+  GeneratorToolingDefaultsAdapter,
+} from "@infrastructure/driven-dvorark-generators";
 
 /**
  * Wires driven adapters and exposes a single object for application modules.
@@ -35,6 +39,8 @@ class DvorarkCliInfrastructureProvider {
   private readonly workspaceInstall = new WorkspaceInstallAdapter();
   private readonly workspaceTarget = new WorkspaceTargetAdapter();
   private readonly workspaceInspection = new WorkspaceInspectionAdapter();
+  private readonly generatorBlueprintSource = new GeneratorBlueprintSourceAdapter();
+  private readonly generatorToolingDefaults = new GeneratorToolingDefaultsAdapter();
 
   getForContext(_ctx: RequestContext) {
     return {
@@ -44,6 +50,8 @@ class DvorarkCliInfrastructureProvider {
       workspaceInstall: this.workspaceInstall,
       workspaceTarget: this.workspaceTarget,
       workspaceInspection: this.workspaceInspection,
+      generatorBlueprintSource: this.generatorBlueprintSource,
+      generatorToolingDefaults: this.generatorToolingDefaults,
     };
   }
 }

@@ -1,6 +1,7 @@
 import type { RequestContext } from "./types";
 import { infrastructureProvider } from "./infrastructure";
 import { WorkspaceBootstrapModule } from "@application/dvorark-bootstrap/modules";
+import { DvorarkGeneratorsModule } from "@application/dvorark-generators/modules";
 /**
  * Request-scoped application modules: Module classes from each `@application` package (its
  * `modules` entry) that wire use-cases
@@ -19,5 +20,13 @@ import { WorkspaceBootstrapModule } from "@application/dvorark-bootstrap/modules
  */
 export function getDvorarkCliModules(ctx: RequestContext) {
   const infrastructure = infrastructureProvider.getForContext(ctx);
-  return { workspaceBootstrap: new WorkspaceBootstrapModule(infrastructure) };
+  return {
+    workspaceBootstrap: new WorkspaceBootstrapModule(infrastructure),
+    dvorarkGenerators: new DvorarkGeneratorsModule({
+      templateRenderer: infrastructure.templateRenderer,
+      workspaceWriter: infrastructure.workspaceWriter,
+      generatorBlueprintSource: infrastructure.generatorBlueprintSource,
+      generatorToolingDefaults: infrastructure.generatorToolingDefaults,
+    }),
+  };
 }

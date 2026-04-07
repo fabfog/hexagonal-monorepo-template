@@ -1,0 +1,24 @@
+{
+  "name": "@application/dvorark-generators",
+  "version": "1.0.0",
+  "description": "",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./ports": "./src/ports/index.ts",
+    "./use-cases": "./src/use-cases/index.ts",
+    "./modules": "./src/modules/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint src",
+    "lint:fix": "eslint src --fix",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@application/dvorark-bootstrap": "workspace:*",
+    "@domain/dvorark-generators": "workspace:*"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.0"
+  }
+}

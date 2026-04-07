@@ -142,23 +142,48 @@ importers:
         specifier: ^4.1.0
         version: 4.1.0(@types/node@25.5.0)(vite@8.0.1(@types/node@25.5.0)(esbuild@0.27.7)(tsx@4.21.0)(yaml@2.8.3))
 
+  packages/application/dvorark-generators:
+    dependencies:
+      '@application/dvorark-bootstrap':
+        specifier: workspace:*
+        version: link:../dvorark-bootstrap
+      '@domain/dvorark-generators':
+        specifier: workspace:*
+        version: link:../../domain/dvorark-generators
+    devDependencies:
+      vitest:
+        specifier: ^4.1.0
+        version: 4.1.0(@types/node@25.5.0)(vite@8.0.1(@types/node@25.5.0)(esbuild@0.27.7)(tsx@4.21.0)(yaml@2.8.3))
+
   packages/composition/dvorark-cli:
     dependencies:
       '@application/dvorark-bootstrap':
         specifier: workspace:*
         version: link:../../application/dvorark-bootstrap
+      '@application/dvorark-generators':
+        specifier: workspace:*
+        version: link:../../application/dvorark-generators
       '@infrastructure/driven-dvorark-bootstrap':
         specifier: workspace:*
         version: link:../../infrastructure/driven-dvorark-bootstrap
+      '@infrastructure/driven-dvorark-generators':
+        specifier: workspace:*
+        version: link:../../infrastructure/driven-dvorark-generators
 
   packages/composition/dvorark-studio:
     dependencies:
       '@application/dvorark-bootstrap':
         specifier: workspace:*
         version: link:../../application/dvorark-bootstrap
+      '@application/dvorark-generators':
+        specifier: workspace:*
+        version: link:../../application/dvorark-generators
       '@infrastructure/driven-dvorark-bootstrap':
         specifier: workspace:*
         version: link:../../infrastructure/driven-dvorark-bootstrap
+      '@infrastructure/driven-dvorark-generators':
+        specifier: workspace:*
+        version: link:../../infrastructure/driven-dvorark-generators
 
   packages/domain/core:
     dependencies:
@@ -194,6 +219,16 @@ importers:
       handlebars:
         specifier: ^4.7.9
         version: 4.7.9
+    devDependencies:
+      vitest:
+        specifier: ^4.1.0
+        version: 4.1.0(@types/node@25.5.0)(vite@8.0.1(@types/node@25.5.0)(esbuild@0.27.7)(tsx@4.21.0)(yaml@2.8.3))
+
+  packages/infrastructure/driven-dvorark-generators:
+    dependencies:
+      '@application/dvorark-generators':
+        specifier: workspace:*
+        version: link:../../application/dvorark-generators
     devDependencies:
       vitest:
         specifier: ^4.1.0
