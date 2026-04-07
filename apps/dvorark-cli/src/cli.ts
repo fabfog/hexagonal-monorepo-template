@@ -11,12 +11,17 @@ import {
   printDomainEntityNoInteractiveHint,
   runGenerateDomainEntityCommand,
 } from "./commands/generate-domain-entity.command";
+import {
+  printDomainValueObjectNoInteractiveHint,
+  runGenerateDomainValueObjectCommand,
+} from "./commands/generate-domain-value-object.command";
 import { runGenerateDomainPackageCommand } from "./commands/generate-domain-package.command";
 import {
   printNoInteractiveHint,
   runApplicationPackageWizard,
   runDomainEntityWizard,
   runDomainPackageWizard,
+  runDomainValueObjectWizard,
   runGenerateMenu,
   runInteractiveMainMenu,
 } from "./interactive";
@@ -257,6 +262,97 @@ export async function runCli(): Promise<void> {
           workspaceRoot,
           domainPackageSlugInput: domainPkg,
           entitySlugInput: entitySlug,
+        });
+      }
+    );
+
+  generate
+    .command("domain-value-object")
+    .description(
+      "Add a Value Object (single-value or composite) to packages/domain/<pkg>/src/value-objects/"
+    )
+    .argument(
+      "[value-object-slug]",
+      "Name or slug (e.g. UserId, ticket-id); omit to prompt interactively"
+    )
+    .option(
+      "--domain-package <slug>",
+      "Domain package folder under packages/domain (required with slug in non-interactive mode)"
+    )
+    .option(
+      "--workspace <dir>",
+      "Monorepo root containing packages/domain (default: current directory)"
+    )
+    .option("--vo-kind <kind>", "single-value or composite (default: single-value)", "single-value")
+    .option(
+      "--primitive <type>",
+      "For single-value: string | boolean | number | Date (default: string)"
+    )
+    .option(
+      "--no-interactive",
+      "Fail if slug or domain package is missing (CI; also respects CI / DVORARK_NO_INTERACTIVE)"
+    )
+    .action(
+      async (
+        valueObjectSlugArg: string | undefined,
+        options: {
+          domainPackage?: string;
+          workspace?: string;
+          voKind?: string;
+          primitive?: string;
+          noInteractive?: boolean;
+        }
+      ): Promise<void> => {
+        const workspaceRoot = options.workspace
+          ? path.resolve(process.cwd(), options.workspace)
+          : process.cwd();
+        const voSlug = valueObjectSlugArg?.trim();
+        const domainPkg = options.domainPackage?.trim();
+        const noInteractive = isNonInteractive(argv) || options.noInteractive === true;
+
+        const voKindRaw = options.voKind?.trim() ?? "single-value";
+        if (voKindRaw !== "single-value" && voKindRaw !== "composite") {
+          console.error(
+            pc.red(`--vo-kind must be single-value or composite (got ${JSON.stringify(voKindRaw)})`)
+          );
+          process.exit(1);
+        }
+        const isComposite = voKindRaw === "composite";
+        const valueObjectKind = isComposite ? "composite" : "single-value";
+
+        if (!voSlug || !domainPkg) {
+          if (noInteractive) {
+            printDomainValueObjectNoInteractiveHint();
+            process.exit(1);
+          }
+          await runDomainValueObjectWizard({
+            ...(options.workspace ? { workspaceRoot } : {}),
+            ...(domainPkg ? { domainPackageSlug: domainPkg } : {}),
+            ...(voSlug ? { valueObjectSlug: voSlug } : {}),
+          });
+          return;
+        }
+
+        let singleValuePrimitive: "string" | "boolean" | "number" | "Date" | undefined;
+        if (!isComposite) {
+          const p = options.primitive?.trim() ?? "string";
+          if (!["string", "boolean", "number", "Date"].includes(p)) {
+            console.error(
+              pc.red(
+                `--primitive must be one of string, boolean, number, Date (got ${JSON.stringify(p)})`
+              )
+            );
+            process.exit(1);
+          }
+          singleValuePrimitive = p as "string" | "boolean" | "number" | "Date";
+        }
+
+        await runGenerateDomainValueObjectCommand({
+          workspaceRoot,
+          domainPackageSlugInput: domainPkg,
+          valueObjectSlugInput: voSlug,
+          valueObjectKind,
+          ...(singleValuePrimitive !== undefined ? { singleValuePrimitive } : {}),
         });
       }
     );

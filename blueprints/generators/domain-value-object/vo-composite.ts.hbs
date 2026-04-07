@@ -1,0 +1,31 @@
+import { z } from 'zod';
+import { deepEqual } from '@domain/core/utils';
+
+export const {{valueObjectPascal}}Schema = z.object({
+  // TODO: add fields
+});
+
+export type {{valueObjectPascal}}Props = z.infer<
+  typeof {{valueObjectPascal}}Schema
+>;
+
+export class {{valueObjectPascal}} {
+  private readonly props: {{valueObjectPascal}}Props;
+
+  constructor(props: {{valueObjectPascal}}Props) {
+    this.props = {{valueObjectPascal}}Schema.parse(props);
+  }
+
+  getProps(): Readonly<{{valueObjectPascal}}Props> {
+    return this.props;
+  }
+
+  equals(other: {{valueObjectPascal}}): boolean {
+    return deepEqual(this.props, other.props);
+  }
+
+  /** Snapshot for mappers / APIs (same shape as {@link getProps}). */
+  toSnapshot(): Readonly<{{valueObjectPascal}}Props> {
+    return this.getProps();
+  }
+}
