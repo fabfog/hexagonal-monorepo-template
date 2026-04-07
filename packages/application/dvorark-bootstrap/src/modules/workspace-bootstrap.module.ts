@@ -3,6 +3,7 @@ import type {
   BlueprintSourcePort,
   TemplateRendererPort,
   WorkspaceInstallPort,
+  WorkspaceTargetPort,
   WorkspaceWriterPort,
 } from "../ports";
 
@@ -11,6 +12,7 @@ export interface WorkspaceBootstrapInfra {
   templateRenderer: TemplateRendererPort;
   workspaceWriter: WorkspaceWriterPort;
   workspaceInstall: WorkspaceInstallPort;
+  workspaceTarget: WorkspaceTargetPort;
 }
 
 export class WorkspaceBootstrapModule {
@@ -22,6 +24,7 @@ export class WorkspaceBootstrapModule {
       templateRenderer: this.infra.templateRenderer,
       workspaceWriter: this.infra.workspaceWriter,
       workspaceInstall: this.infra.workspaceInstall,
+      workspaceTarget: this.infra.workspaceTarget,
     });
   }
 }

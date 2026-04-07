@@ -1,0 +1,16 @@
+{
+  "name": "dvorark-cli",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "lint": "eslint src",
+    "lint:fix": "eslint src --fix",
+    "test": "echo \"No tests yet\" && exit 0"
+  },
+  "dependencies": {
+    "@composition/dvorark-cli": "workspace:*",
+    "tsx": "^4.21.0"
+  }
+}

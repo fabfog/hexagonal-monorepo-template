@@ -7,6 +7,9 @@ import {
 describe("CreateWorkspaceFromBlueprintUseCase", () => {
   it("renders and writes the starter blueprint", async () => {
     const deps: CreateWorkspaceFromBlueprintUseCaseDependencies = {
+      workspaceTarget: {
+        ensureReadyForCreate: vi.fn().mockResolvedValue(undefined),
+      },
       blueprintSource: {
         readStarterBlueprint: vi.fn().mockResolvedValue([
           {
@@ -34,6 +37,7 @@ describe("CreateWorkspaceFromBlueprintUseCase", () => {
     });
 
     expect(result.filesWritten).toBe(1);
+    expect(deps.workspaceTarget.ensureReadyForCreate).toHaveBeenCalledWith("/tmp/my-repo");
     expect(deps.workspaceWriter.writeFiles).toHaveBeenCalledWith("/tmp/my-repo", [
       { relativePath: "README.md", contents: "## my-repo" },
     ]);

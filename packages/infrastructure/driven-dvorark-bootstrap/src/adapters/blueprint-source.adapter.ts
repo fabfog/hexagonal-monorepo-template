@@ -4,8 +4,10 @@ import type {
 } from "@application/dvorark-bootstrap/ports";
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-const REPO_ROOT = path.resolve(__dirname, "../../../../");
+const dirname = path.dirname(fileURLToPath(import.meta.url));
+const REPO_ROOT = path.resolve(dirname, "../../../../../");
 const BLUEPRINT_ROOT = path.join(REPO_ROOT, "blueprints", "starter");
 
 function readFilesRecursively(
@@ -21,7 +23,7 @@ function readFilesRecursively(
     }
     const rel = path.relative(rootDir, abs).replace(/\\/g, "/");
     out.push({
-      relativePath: rel.replace(/\.hbs$/, ""),
+      relativePath: rel.replace(/^root\//, "").replace(/\.hbs$/, ""),
       kind: rel.endsWith(".hbs") ? "template" : "static",
       contents: fs.readFileSync(abs, "utf8"),
     });

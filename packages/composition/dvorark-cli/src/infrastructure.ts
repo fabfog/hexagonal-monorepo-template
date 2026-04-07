@@ -3,6 +3,7 @@ import {
   BlueprintSourceAdapter,
   TemplateRendererAdapter,
   WorkspaceInstallAdapter,
+  WorkspaceTargetAdapter,
   WorkspaceWriterAdapter,
 } from "@infrastructure/driven-dvorark-bootstrap";
 
@@ -31,6 +32,7 @@ class DvorarkCliInfrastructureProvider {
   private readonly templateRenderer = new TemplateRendererAdapter();
   private readonly workspaceWriter = new WorkspaceWriterAdapter();
   private readonly workspaceInstall = new WorkspaceInstallAdapter();
+  private readonly workspaceTarget = new WorkspaceTargetAdapter();
 
   getForContext(_ctx: RequestContext) {
     return {
@@ -38,6 +40,7 @@ class DvorarkCliInfrastructureProvider {
       templateRenderer: this.templateRenderer,
       workspaceWriter: this.workspaceWriter,
       workspaceInstall: this.workspaceInstall,
+      workspaceTarget: this.workspaceTarget,
     };
   }
 }
