@@ -6,9 +6,11 @@ import { Command } from "commander";
 import pc from "picocolors";
 
 import { runCreateCommand } from "./commands/create.command";
+import { runGenerateApplicationPackageCommand } from "./commands/generate-application-package.command";
 import { runGenerateDomainPackageCommand } from "./commands/generate-domain-package.command";
 import {
   printNoInteractiveHint,
+  runApplicationPackageWizard,
   runDomainPackageWizard,
   runGenerateMenu,
   runInteractiveMainMenu,
@@ -63,7 +65,7 @@ export async function runCli(): Promise<void> {
     if (isNonInteractive(argv)) {
       console.error(
         pc.red(
-          "Interactive mode disabled. Run e.g. dvorark generate domain-package <slug> or unset CI / DVORARK_NO_INTERACTIVE."
+          "Interactive mode disabled. Run e.g. dvorark generate domain-package <slug> or generate application-package <slug>, or unset CI / DVORARK_NO_INTERACTIVE."
         )
       );
       process.exit(1);
@@ -81,7 +83,7 @@ export async function runCli(): Promise<void> {
     if (isNonInteractive(argv)) {
       console.error(
         pc.red(
-          "Interactive mode disabled. Run e.g. dvorark generate domain-package <slug> or unset CI / DVORARK_NO_INTERACTIVE."
+          "Interactive mode disabled. Run e.g. dvorark generate domain-package <slug> or generate application-package <slug>, or unset CI / DVORARK_NO_INTERACTIVE."
         )
       );
       process.exit(1);
@@ -151,6 +153,53 @@ export async function runCli(): Promise<void> {
         }
 
         await runGenerateDomainPackageCommand({
+          workspaceRoot,
+          packageSlugInput: slug,
+          ...(options.vitest !== undefined ? { vitestVersionOverride: options.vitest } : {}),
+        });
+      }
+    );
+
+  generate
+    .command("application-package")
+    .description("Create a new @application/* package under packages/application")
+    .argument(
+      "[package-slug]",
+      "Package segment (e.g. user, user-profile); omit to prompt interactively"
+    )
+    .option(
+      "--workspace <dir>",
+      "Monorepo root containing packages/application (default: current directory)"
+    )
+    .option("--vitest <range>", "Override vitest devDependency range in generated package.json")
+    .option(
+      "--no-interactive",
+      "Fail if slug is missing (CI; also respects CI / DVORARK_NO_INTERACTIVE)"
+    )
+    .action(
+      async (
+        packageSlug: string | undefined,
+        options: { workspace?: string; vitest?: string; noInteractive?: boolean }
+      ): Promise<void> => {
+        const workspaceRoot = options.workspace
+          ? path.resolve(process.cwd(), options.workspace)
+          : process.cwd();
+        const slug = packageSlug?.trim();
+        const noInteractive = isNonInteractive(argv) || options.noInteractive === true;
+
+        if (!slug) {
+          if (noInteractive) {
+            printNoInteractiveHint();
+            process.exit(1);
+          }
+          await runApplicationPackageWizard({
+            ...(options.workspace ? { workspaceRoot } : {}),
+            ...(options.vitest !== undefined ? { vitestVersionOverride: options.vitest } : {}),
+          });
+          return;
+        }
+
+        await runGenerateApplicationPackageCommand({
           workspaceRoot,
           packageSlugInput: slug,
           ...(options.vitest !== undefined ? { vitestVersionOverride: options.vitest } : {}),
