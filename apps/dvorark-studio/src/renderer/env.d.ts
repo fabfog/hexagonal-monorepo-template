@@ -11,6 +11,11 @@ declare global {
         targetDirectory: string;
         installDependencies: boolean;
       }) => Promise<StudioWorkspaceResult>;
+      createDomainPackage: (payload: {
+        workspaceRoot: string;
+        packageSlugInput: string;
+        vitestVersionOverride?: string;
+      }) => Promise<{ filesWritten: number; packageSlug: string }>;
       onWorkspaceOpened: (
         listener: (payload: { directoryPath: string; status: "bootstrap" | "workspace" }) => void
       ) => () => void;

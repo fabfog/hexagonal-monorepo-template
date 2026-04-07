@@ -168,6 +168,20 @@ ipcMain.handle(
   }
 );
 
+ipcMain.handle(
+  "studio:create-domain-package",
+  async (
+    _event,
+    payload: {
+      workspaceRoot: string;
+      packageSlugInput: string;
+      vitestVersionOverride?: string;
+    }
+  ) => {
+    return studioModules.dvorarkGenerators.createDomainPackage().execute(payload);
+  }
+);
+
 app.whenReady().then(() => {
   mainWindow = createWindow();
   createMenu(mainWindow);

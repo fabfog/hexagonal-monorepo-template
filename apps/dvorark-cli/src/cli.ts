@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { Command } from "commander";
 
 import { runCreateCommand } from "./commands/create.command";
+import { runGenerateDomainPackageCommand } from "./commands/generate-domain-package.command";
 import { runWorkspaceCommand } from "./commands/workspace.command";
 
 const cliPackageJsonPath = path.join(
@@ -54,6 +55,33 @@ export async function runCli(): Promise<void> {
         install: options.install ?? false,
       });
     });
+
+  const generate = program.command("generate").description("Run code generators");
+
+  generate
+    .command("domain-package")
+    .description("Create a new @domain/* package under packages/domain")
+    .argument("<package-slug>", "Package segment (e.g. user, user-profile)")
+    .option(
+      "--workspace <dir>",
+      "Monorepo root containing packages/domain (default: current directory)"
+    )
+    .option("--vitest <range>", "Override vitest devDependency range in generated package.json")
+    .action(
+      async (
+        packageSlug: string,
+        options: { workspace?: string; vitest?: string }
+      ): Promise<void> => {
+        const workspaceRoot = options.workspace
+          ? path.resolve(process.cwd(), options.workspace)
+          : process.cwd();
+        await runGenerateDomainPackageCommand({
+          workspaceRoot,
+          packageSlugInput: packageSlug,
+          ...(options.vitest !== undefined ? { vitestVersionOverride: options.vitest } : {}),
+        });
+      }
+    );
 
   await program.parseAsync(argv);
 }

@@ -54,7 +54,9 @@ export function StudioApp() {
           onWorkspaceCreated={handleWorkspaceCreated}
         />
       )}
-      {workspace.status === "workspace" && <WorkspaceView />}
+      {workspace.status === "workspace" && (
+        <WorkspaceView workspaceRoot={workspace.directoryPath ?? ""} />
+      )}
     </StudioShell>
   );
 }
