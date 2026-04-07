@@ -3,6 +3,7 @@ import { runDomainEntityWizard } from "./domain-entity.wizard";
 import { runDomainPackageWizard } from "./domain-package.wizard";
 import { runDomainValueObjectWizard } from "./domain-value-object.wizard";
 import { runDomainErrorWizard } from "./domain-error.wizard";
+import { runDomainServiceWizard } from "./domain-service.wizard";
 
 export async function runDomainMenu(targetDirectory: string): Promise<void> {
   for (;;) {
@@ -13,6 +14,7 @@ export async function runDomainMenu(targetDirectory: string): Promise<void> {
         { value: "domain-entity", label: "Domain entity" },
         { value: "domain-value-object", label: "Domain value object" },
         { value: "domain-error", label: "Domain error" },
+        { value: "domain-service", label: "Domain service" },
         { value: "back", label: "Back" },
       ],
     });
@@ -35,6 +37,10 @@ export async function runDomainMenu(targetDirectory: string): Promise<void> {
 
     if (choice === "domain-error") {
       await runDomainErrorWizard({ workspaceRoot: targetDirectory });
+    }
+
+    if (choice === "domain-service") {
+      await runDomainServiceWizard({ workspaceRoot: targetDirectory });
     }
   }
 }

@@ -16,6 +16,11 @@ import {
   runGenerateDomainErrorCommand,
 } from "./commands/generate-domain-error.command";
 import {
+  parseEntityCsv,
+  printDomainServiceNoInteractiveHint,
+  runGenerateDomainServiceCommand,
+} from "./commands/generate-domain-service.command";
+import {
   printDomainValueObjectNoInteractiveHint,
   runGenerateDomainValueObjectCommand,
 } from "./commands/generate-domain-value-object.command";
@@ -26,6 +31,7 @@ import {
   runDomainEntityWizard,
   runDomainErrorWizard,
   runDomainPackageWizard,
+  runDomainServiceWizard,
   runDomainValueObjectWizard,
   runGenerateMenu,
   runInteractiveMainMenu,
@@ -437,6 +443,76 @@ export async function runCli(): Promise<void> {
           }
           throw e;
         }
+      }
+    );
+
+  generate
+    .command("domain-service")
+    .description(
+      "Add a domain service (execute + Input/Output) under packages/domain/<pkg>/src/services/"
+    )
+    .option(
+      "--domain-package <slug>",
+      "Domain package folder under packages/domain (required in non-interactive mode)"
+    )
+    .option(
+      "--service-name <name>",
+      "Service base name without Service suffix (required in non-interactive mode)"
+    )
+    .option(
+      "--entities <list>",
+      "Comma-separated entity stems (e.g. User,LineItem); required in non-interactive mode"
+    )
+    .option(
+      "--workspace <dir>",
+      "Monorepo root containing packages/domain (default: current directory)"
+    )
+    .option(
+      "--no-interactive",
+      "Fail if required options are missing (CI; also respects CI / DVORARK_NO_INTERACTIVE)"
+    )
+    .action(
+      async (options: {
+        domainPackage?: string;
+        workspace?: string;
+        serviceName?: string;
+        entities?: string;
+        noInteractive?: boolean;
+      }): Promise<void> => {
+        const workspaceRoot = options.workspace
+          ? path.resolve(process.cwd(), options.workspace)
+          : process.cwd();
+        const domainPkg = options.domainPackage?.trim();
+        const serviceName = options.serviceName?.trim();
+        const entitiesRaw = options.entities?.trim();
+        const noInteractive = isNonInteractive(argv) || options.noInteractive === true;
+
+        const needsWizard = !domainPkg || !serviceName || !entitiesRaw;
+
+        if (needsWizard) {
+          if (noInteractive) {
+            printDomainServiceNoInteractiveHint();
+            process.exit(1);
+          }
+          await runDomainServiceWizard({
+            ...(options.workspace ? { workspaceRoot } : {}),
+            ...(domainPkg ? { domainPackageSlug: domainPkg } : {}),
+          });
+          return;
+        }
+
+        const selectedEntityPascalNames = parseEntityCsv(entitiesRaw);
+        if (selectedEntityPascalNames.length === 0) {
+          console.error(pc.red("--entities must list at least one entity"));
+          process.exit(1);
+        }
+
+        await runGenerateDomainServiceCommand({
+          workspaceRoot,
+          domainPackageSlugInput: domainPkg,
+          serviceNameInput: serviceName,
+          selectedEntityPascalNames,
+        });
       }
     );
 

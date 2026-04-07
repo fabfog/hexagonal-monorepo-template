@@ -12,6 +12,7 @@
   "dependencies": {
     "@clack/prompts": "^0.11.0",
     "@composition/dvorark-cli": "workspace:*",
+    "case-anything": "^3.1.2",
     "commander": "^13.1.0",
     "picocolors": "^1.1.1",
     "tsx": "^4.21.0",

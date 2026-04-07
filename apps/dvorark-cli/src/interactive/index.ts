@@ -4,6 +4,7 @@ export type {
   DomainEntityWizardInput,
   DomainErrorWizardInput,
   DomainPackageWizardInput,
+  DomainServiceWizardInput,
   DomainValueObjectWizardInput,
 } from "./generate/domain";
 export {
@@ -12,6 +13,7 @@ export {
   runDomainErrorWizard,
   runDomainMenu,
   runDomainPackageWizard,
+  runDomainServiceWizard,
   runDomainValueObjectWizard,
 } from "./generate/domain";
 export { runGenerateMenu } from "./generate";

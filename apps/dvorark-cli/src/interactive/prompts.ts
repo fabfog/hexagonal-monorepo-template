@@ -5,7 +5,7 @@
  * action, and `updateSettings({ aliases })` cannot override existing aliases. So a global
  * listener cannot treat Esc as "back" and Ctrl+C as "exit" without replacing Clack.
  */
-import { isCancel, select, text } from "@clack/prompts";
+import { isCancel, multiselect, select, text } from "@clack/prompts";
 
 import { exitCliOnInterrupt } from "./exit-cli-on-interrupt";
 
@@ -22,6 +22,16 @@ export async function promptSelect<Value>(
   options: Parameters<typeof select<Value>>[0]
 ): Promise<Value> {
   const result = await select(options);
+  if (isCancel(result)) {
+    exitCliOnInterrupt();
+  }
+  return result;
+}
+
+export async function promptMultiselect<Value>(
+  options: Parameters<typeof multiselect<Value>>[0]
+): Promise<Value[]> {
+  const result = await multiselect(options);
   if (isCancel(result)) {
     exitCliOnInterrupt();
   }
