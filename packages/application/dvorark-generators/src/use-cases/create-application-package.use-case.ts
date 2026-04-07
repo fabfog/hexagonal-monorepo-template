@@ -3,7 +3,7 @@ import type {
   WorkspaceFileToWrite,
   WorkspaceWriterPort,
 } from "@application/dvorark-bootstrap/ports";
-import { DomainPackageSlug } from "@domain/dvorark-generators/value-objects";
+import { ApplicationPackageSlug } from "@domain/dvorark-generators/value-objects";
 import type { CreateApplicationPackageInputDto } from "../dto/create-application-package.dto";
 import type { GeneratorBlueprintSourcePort, GeneratorToolingDefaultsPort } from "../ports";
 
@@ -28,7 +28,7 @@ export class CreateApplicationPackageUseCase {
   async execute(
     input: CreateApplicationPackageInputDto
   ): Promise<CreateApplicationPackageUseCaseReturn> {
-    const slug = DomainPackageSlug.fromString(input.packageSlugInput);
+    const slug = ApplicationPackageSlug.fromString(input.packageSlugInput);
 
     const vitestVersion =
       input.vitestVersionOverride ??

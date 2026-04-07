@@ -7,10 +7,15 @@ import pc from "picocolors";
 
 import { runCreateCommand } from "./commands/create.command";
 import { runGenerateApplicationPackageCommand } from "./commands/generate-application-package.command";
+import {
+  printDomainEntityNoInteractiveHint,
+  runGenerateDomainEntityCommand,
+} from "./commands/generate-domain-entity.command";
 import { runGenerateDomainPackageCommand } from "./commands/generate-domain-package.command";
 import {
   printNoInteractiveHint,
   runApplicationPackageWizard,
+  runDomainEntityWizard,
   runDomainPackageWizard,
   runGenerateMenu,
   runInteractiveMainMenu,
@@ -203,6 +208,55 @@ export async function runCli(): Promise<void> {
           workspaceRoot,
           packageSlugInput: slug,
           ...(options.vitest !== undefined ? { vitestVersionOverride: options.vitest } : {}),
+        });
+      }
+    );
+
+  generate
+    .command("domain-entity")
+    .description("Create a domain entity file under packages/domain/<pkg>/src/entities/")
+    .argument("[entity-slug]", "Entity segment (e.g. line-item); omit to prompt interactively")
+    .option(
+      "--domain-package <slug>",
+      "Domain package folder under packages/domain (required with entity slug in non-interactive mode)"
+    )
+    .option(
+      "--workspace <dir>",
+      "Monorepo root containing packages/domain (default: current directory)"
+    )
+    .option(
+      "--no-interactive",
+      "Fail if entity slug or domain package is missing (CI; also respects CI / DVORARK_NO_INTERACTIVE)"
+    )
+    .action(
+      async (
+        entitySlugArg: string | undefined,
+        options: { domainPackage?: string; workspace?: string; noInteractive?: boolean }
+      ): Promise<void> => {
+        const workspaceRoot = options.workspace
+          ? path.resolve(process.cwd(), options.workspace)
+          : process.cwd();
+        const entitySlug = entitySlugArg?.trim();
+        const domainPkg = options.domainPackage?.trim();
+        const noInteractive = isNonInteractive(argv) || options.noInteractive === true;
+
+        if (!entitySlug || !domainPkg) {
+          if (noInteractive) {
+            printDomainEntityNoInteractiveHint();
+            process.exit(1);
+          }
+          await runDomainEntityWizard({
+            ...(options.workspace ? { workspaceRoot } : {}),
+            ...(domainPkg ? { domainPackageSlug: domainPkg } : {}),
+            ...(entitySlug ? { entitySlug } : {}),
+          });
+          return;
+        }
+
+        await runGenerateDomainEntityCommand({
+          workspaceRoot,
+          domainPackageSlugInput: domainPkg,
+          entitySlugInput: entitySlug,
         });
       }
     );

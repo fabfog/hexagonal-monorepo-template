@@ -5,6 +5,7 @@ import {
   WorkspaceInspectionAdapter,
   WorkspaceInstallAdapter,
   WorkspaceTargetAdapter,
+  WorkspaceReaderAdapter,
   WorkspaceWriterAdapter,
 } from "@infrastructure/driven-dvorark-bootstrap";
 import {
@@ -15,6 +16,7 @@ import {
 class DvorarkStudioInfrastructureProvider {
   private readonly blueprintSource = new BlueprintSourceAdapter();
   private readonly templateRenderer = new TemplateRendererAdapter();
+  private readonly workspaceReader = new WorkspaceReaderAdapter();
   private readonly workspaceWriter = new WorkspaceWriterAdapter();
   private readonly workspaceInstall = new WorkspaceInstallAdapter();
   private readonly workspaceTarget = new WorkspaceTargetAdapter();
@@ -26,6 +28,7 @@ class DvorarkStudioInfrastructureProvider {
     return {
       blueprintSource: this.blueprintSource,
       templateRenderer: this.templateRenderer,
+      workspaceReader: this.workspaceReader,
       workspaceWriter: this.workspaceWriter,
       workspaceInstall: this.workspaceInstall,
       workspaceTarget: this.workspaceTarget,

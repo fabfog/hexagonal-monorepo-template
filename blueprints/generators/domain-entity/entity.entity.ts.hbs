@@ -1,0 +1,44 @@
+import { z } from "zod";
+
+import { {{entityPascal}}Id } from "../value-objects/{{voIdFileKebab}}.vo";
+
+export const {{entityPascal}}Schema = z.object({
+  // TODO: add fields (use `domain-entity-add-vo-field` for VO-backed props; entity id is separate)
+});
+
+export type {{entityPascal}}DataProps = z.infer<typeof {{entityPascal}}Schema>;
+
+export type {{entityPascal}}Props = { id: {{entityPascal}}Id } & {{entityPascal}}DataProps;
+
+export class {{entityPascal}}Entity {
+  private readonly _id: {{entityPascal}}Id;
+  private readonly _props: {{entityPascal}}DataProps;
+
+  constructor({ id, ...data }: {{entityPascal}}Props) {
+    this._id = id;
+    this._props = {{entityPascal}}Schema.parse(data);
+  }
+
+  /**
+   * Fast access to the id string value (stored internally as a VO).
+   * Useful for repositories / mappers that only need the id.
+   */
+  get id(): string {
+    return this._id.value;
+  }
+
+  /**
+   * Fast access to the entity data props (excluding the `id` VO).
+   */
+  get props(): Readonly<{{entityPascal}}DataProps> {
+    return this._props;
+  }
+
+  /** Snapshot for mappers / APIs (nested value objects are still VOs; use `.value` where you need primitives). */
+  toSnapshot(): Readonly<{{entityPascal}}Props> {
+    return Object.freeze({
+      id: this._id,
+      ...this._props,
+    });
+  }
+}

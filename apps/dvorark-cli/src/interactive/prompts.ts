@@ -14,7 +14,8 @@ export async function promptText(options: Parameters<typeof text>[0]): Promise<s
   if (isCancel(result)) {
     exitCliOnInterrupt();
   }
-  return result;
+  // Clack may resolve with `undefined` on empty submit in some cases; callers expect a string.
+  return typeof result === "string" ? result : "";
 }
 
 export async function promptSelect<Value>(

@@ -1,0 +1,22 @@
+import { z } from "zod";
+
+export const {{valueObjectPascal}}Schema = {{{singleValueSchema}}};
+
+export type {{valueObjectPascal}}Input = z.infer<typeof {{valueObjectPascal}}Schema>;
+
+export class {{valueObjectPascal}} {
+  private readonly _value: {{singleValuePrimitive}};
+
+  constructor(input: {{valueObjectPascal}}Input) {
+    const parsed = {{valueObjectPascal}}Schema.parse(input);
+    this._value = parsed;
+  }
+
+  get value(): {{singleValuePrimitive}} {
+    return this._value;
+  }
+
+  equals(other: {{valueObjectPascal}}): boolean {
+    {{{singleValueEqualsBody}}}
+  }
+}

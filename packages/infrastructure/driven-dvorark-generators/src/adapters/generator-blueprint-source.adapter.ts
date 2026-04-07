@@ -30,6 +30,38 @@ function resolveBlueprintsGeneratorsRoot(startDir: string): string {
 
 const BLUEPRINTS_GENERATORS_ROOT = resolveBlueprintsGeneratorsRoot(dirname);
 
+function collectBlueprintFiles(generatorRoot: string): GeneratorBlueprintFile[] {
+  const out: GeneratorBlueprintFile[] = [];
+
+  function walk(dir: string): void {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      const rel = path.relative(generatorRoot, full).replace(/\\/g, "/");
+      if (entry.isDirectory()) {
+        walk(full);
+        continue;
+      }
+      if (entry.name.endsWith(".hbs")) {
+        out.push({
+          relativePath: rel.slice(0, -".hbs".length),
+          kind: "template",
+          contents: fs.readFileSync(full, "utf8"),
+        });
+      } else {
+        out.push({
+          relativePath: rel,
+          kind: "static",
+          contents: fs.readFileSync(full, "utf8"),
+        });
+      }
+    }
+  }
+
+  walk(generatorRoot);
+  out.sort((a, b) => a.relativePath.localeCompare(b.relativePath));
+  return out;
+}
+
 export class GeneratorBlueprintSourceAdapter implements GeneratorBlueprintSourcePort {
   async load(generatorId: string): Promise<GeneratorBlueprintFile[]> {
     const root = path.join(BLUEPRINTS_GENERATORS_ROOT, generatorId);
@@ -37,22 +69,6 @@ export class GeneratorBlueprintSourceAdapter implements GeneratorBlueprintSource
       throw new Error(`Unknown generator blueprint: ${generatorId} (expected ${root})`);
     }
 
-    return [
-      {
-        relativePath: "package.json",
-        kind: "template",
-        contents: fs.readFileSync(path.join(root, "package.json.hbs"), "utf8"),
-      },
-      {
-        relativePath: "tsconfig.json",
-        kind: "template",
-        contents: fs.readFileSync(path.join(root, "tsconfig.json.hbs"), "utf8"),
-      },
-      {
-        relativePath: "src/.gitkeep",
-        kind: "static",
-        contents: fs.readFileSync(path.join(root, "src", ".gitkeep"), "utf8"),
-      },
-    ];
+    return collectBlueprintFiles(root);
   }
 }

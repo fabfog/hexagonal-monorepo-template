@@ -9,6 +9,7 @@ export function getDvorarkStudioModules(ctx: RequestContext) {
     workspaceBootstrap: new WorkspaceBootstrapModule(infrastructure),
     dvorarkGenerators: new DvorarkGeneratorsModule({
       templateRenderer: infrastructure.templateRenderer,
+      workspaceReader: infrastructure.workspaceReader,
       workspaceWriter: infrastructure.workspaceWriter,
       generatorBlueprintSource: infrastructure.generatorBlueprintSource,
       generatorToolingDefaults: infrastructure.generatorToolingDefaults,
