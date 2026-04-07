@@ -6,6 +6,15 @@ import type {
   WorkspaceWriterPort,
 } from "@application/dvorark-bootstrap/ports";
 import { DomainPackageSlug, ValueObjectSlug } from "@domain/dvorark-generators/value-objects";
+import {
+  domainPackageJsonRelativePath,
+  domainPackageRootRelative,
+  domainSliceIndexRelativePath,
+} from "../common-packages-operations/domain";
+import {
+  mergeBarrelExport,
+  patchPackageJsonWithZodAndExports,
+} from "../common-packages-operations/shared";
 import type {
   CreateDomainValueObjectInputDto,
   SingleValuePrimitive,
@@ -14,8 +23,6 @@ import type { GeneratorBlueprintSourcePort } from "../ports";
 
 /** Blueprint folder under `blueprints/generators/<id>/`. */
 export const DOMAIN_VALUE_OBJECT_GENERATOR_ID = "domain-value-object" as const;
-
-const ZOD_RANGE = "^3.23.8";
 
 const primitiveSchemaByType: Record<SingleValuePrimitive, string> = {
   string: "z.string().min(1)",
@@ -43,41 +50,6 @@ export interface CreateDomainValueObjectUseCaseReturn {
   domainPackageSlug: string;
   valueObjectSlug: string;
   valueObjectKind: CreateDomainValueObjectInputDto["valueObjectKind"];
-}
-
-function mergeBarrelExport(
-  existing: string | null,
-  exportLine: string,
-  emptyBarrelPattern: RegExp
-): string {
-  if (!existing) {
-    return `${exportLine}\n`;
-  }
-  const cleaned = existing.replace(emptyBarrelPattern, "").trimEnd();
-  if (cleaned.includes(exportLine)) {
-    return `${cleaned}\n`;
-  }
-  return cleaned.length > 0 ? `${cleaned}\n${exportLine}\n` : `${exportLine}\n`;
-}
-
-function patchDomainPackageJson(raw: string): string {
-  const pkg = JSON.parse(raw) as {
-    dependencies?: Record<string, string>;
-    exports?: Record<string, string> | unknown[];
-  };
-  pkg.dependencies = pkg.dependencies ?? {};
-  if (!pkg.dependencies.zod) {
-    pkg.dependencies.zod = ZOD_RANGE;
-  }
-  if (!pkg.exports || typeof pkg.exports !== "object" || Array.isArray(pkg.exports)) {
-    pkg.exports = {};
-  }
-  const exportsObj = pkg.exports as Record<string, string>;
-  const key = "./value-objects";
-  if (!exportsObj[key]) {
-    exportsObj[key] = "./src/value-objects/index.ts";
-  }
-  return `${JSON.stringify(pkg, null, 2)}\n`;
 }
 
 export class CreateDomainValueObjectUseCase {
@@ -115,9 +87,10 @@ export class CreateDomainValueObjectUseCase {
 
     const voContents = await this.deps.templateRenderer.render(tpl.contents, voData);
 
-    const base = `packages/domain/${domainPkg.value}`;
-    const pkgJsonRel = `${base}/package.json`;
-    const voIndexRel = `${base}/src/value-objects/index.ts`;
+    const slug = domainPkg.value;
+    const pkgJsonRel = domainPackageJsonRelativePath(slug);
+    const voIndexRel = domainSliceIndexRelativePath(slug, "value-objects");
+    const domainRoot = domainPackageRootRelative(slug);
 
     const existingPkgJson = await this.deps.workspaceReader.readTextIfExists(
       input.workspaceRoot,
@@ -129,19 +102,23 @@ export class CreateDomainValueObjectUseCase {
     );
 
     const exportVo = `export * from './${voSlug.value}.vo';`;
-    const emptyExport = /^export\s*{\s*}\s*;?\s*$/m;
-    const mergedVoIndex = mergeBarrelExport(existingVoIndex, exportVo, emptyExport);
+    const mergedVoIndex = mergeBarrelExport(existingVoIndex, exportVo);
 
     const files: WorkspaceFileToWrite[] = [
       {
-        relativePath: `${base}/src/value-objects/${voSlug.value}.vo.ts`,
+        relativePath: `${domainRoot}/src/value-objects/${voSlug.value}.vo.ts`,
         contents: voContents,
       },
       { relativePath: voIndexRel, contents: mergedVoIndex },
     ];
 
     if (existingPkgJson) {
-      files.push({ relativePath: pkgJsonRel, contents: patchDomainPackageJson(existingPkgJson) });
+      files.push({
+        relativePath: pkgJsonRel,
+        contents: patchPackageJsonWithZodAndExports(existingPkgJson, {
+          exportSubpaths: ["value-objects"],
+        }),
+      });
     }
 
     await this.deps.workspaceWriter.writeFiles(input.workspaceRoot, files);

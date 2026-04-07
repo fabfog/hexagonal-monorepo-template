@@ -1,0 +1,16 @@
+import { describe, expect, it } from "vitest";
+import {
+  domainPackageJsonRelativePath,
+  domainPackageRootRelative,
+  domainSliceIndexRelativePath,
+} from "./paths";
+
+describe("domain package paths", () => {
+  it("match monorepo layout", () => {
+    expect(domainPackageRootRelative("user")).toBe("packages/domain/user");
+    expect(domainPackageJsonRelativePath("user")).toBe("packages/domain/user/package.json");
+    expect(domainSliceIndexRelativePath("user", "entities")).toBe(
+      "packages/domain/user/src/entities/index.ts"
+    );
+  });
+});
