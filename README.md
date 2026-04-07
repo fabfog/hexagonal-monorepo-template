@@ -1,4 +1,4 @@
-## hexagonal-monorepo-template
+## dvorark
 
 pnpm-based monorepo designed for a hexagonal architecture (Domain / Application / Infrastructure / UI) with shared configuration for TypeScript, ESLint, and Prettier.
 

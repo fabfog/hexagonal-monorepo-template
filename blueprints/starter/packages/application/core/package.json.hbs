@@ -1,0 +1,20 @@
+{
+  "name": "@application/core",
+  "version": "1.0.0",
+  "description": "",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./dtos": "./src/dtos/index.ts",
+    "./mappers": "./src/mappers/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint src",
+    "lint:fix": "eslint src --fix",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@domain/core": "workspace:*",
+    "zod": "^3.23.8"
+  }
+}

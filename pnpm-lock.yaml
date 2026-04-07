@@ -86,11 +86,43 @@ importers:
         specifier: ^3.23.8
         version: 3.25.76
 
+  packages/application/dvorark-bootstrap:
+    dependencies:
+      '@application/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      vitest:
+        specifier: ^4.1.0
+        version: 4.1.0(@types/node@25.5.0)(vite@8.0.1(@types/node@25.5.0)(yaml@2.8.3))
+
+  packages/composition/dvorark-cli:
+    dependencies:
+      '@application/dvorark-bootstrap':
+        specifier: workspace:*
+        version: link:../../application/dvorark-bootstrap
+      '@infrastructure/driven-dvorark-bootstrap':
+        specifier: workspace:*
+        version: link:../../infrastructure/driven-dvorark-bootstrap
+
   packages/domain/core:
     dependencies:
       zod:
         specifier: ^3.23.8
         version: 3.25.76
+    devDependencies:
+      vitest:
+        specifier: ^4.1.0
+        version: 4.1.0(@types/node@25.5.0)(vite@8.0.1(@types/node@25.5.0)(yaml@2.8.3))
+
+  packages/infrastructure/driven-dvorark-bootstrap:
+    dependencies:
+      '@application/dvorark-bootstrap':
+        specifier: workspace:*
+        version: link:../../application/dvorark-bootstrap
+      handlebars:
+        specifier: ^4.7.9
+        version: 4.7.9
     devDependencies:
       vitest:
         specifier: ^4.1.0
@@ -1016,6 +1048,11 @@ packages:
 
   handlebars@4.7.8:
     resolution: {integrity: sha512-vafaFqs8MZkRrSX7sFVUdo3ap/eNiLnb4IakshzvP56X5Nr1iGKAIqdX6tMlm6HcNRIkr6AxO5jFEoJzzpT8aQ==}
+    engines: {node: '>=0.4.7'}
+    hasBin: true
+
+  handlebars@4.7.9:
+    resolution: {integrity: sha512-4E71E0rpOaQuJR2A3xDZ+GM1HyWYv1clR58tC8emQNeQe3RH7MAzSbat+V0wG78LQBo6m6bzSG/L4pBuCsgnUQ==}
     engines: {node: '>=0.4.7'}
     hasBin: true
 
@@ -2721,6 +2758,15 @@ snapshots:
   graceful-fs@4.2.11: {}
 
   handlebars@4.7.8:
+    dependencies:
+      minimist: 1.2.8
+      neo-async: 2.6.2
+      source-map: 0.6.1
+      wordwrap: 1.0.0
+    optionalDependencies:
+      uglify-js: 3.19.3
+
+  handlebars@4.7.9:
     dependencies:
       minimist: 1.2.8
       neo-async: 2.6.2

@@ -1,10 +1,9 @@
 {
-  "name": "dvorark",
+  "name": "{{repoName}}",
   "private": true,
   "scripts": {
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "plop": "plop --plopfile plop/plopfile.cjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
@@ -12,12 +11,7 @@
     "test:coverage": "vitest run --coverage",
     "prepare": "husky install",
     "deps:renovate": "npx -p renovate renovate-config-validator renovate.json",
-    "deps:lint": "depcruise --config .dependency-cruiser.cjs packages -T err-long",
-    "deps:graph": "node scripts/deps-graph-html-open.cjs",
-    "deps:graph:composition": "node scripts/deps-composition-graph-open.cjs",
-    "deps:graph:module": "node scripts/deps-module-graph-open.cjs",
-    "demo:generate": "node scripts/demo/generate-demo-stack.cjs --confirm-install",
-    "demo:remove": "node scripts/demo/remove-demo-stack.cjs"
+    "deps:lint": "depcruise --config .dependency-cruiser.cjs packages -T err-long"
   },
   "devDependencies": {
     "@repo/config-eslint": "workspace:^",
@@ -28,8 +22,6 @@
     "eslint-config-prettier": "^10.1.8",
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",
-    "node-plop": "^0.32.3",
-    "plop": "^4.0.5",
     "prettier": "^3.4.2",
     "typescript": "^5.7.3",
     "vitest": "^4.1.0"

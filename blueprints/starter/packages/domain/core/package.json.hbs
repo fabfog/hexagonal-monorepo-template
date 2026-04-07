@@ -1,0 +1,23 @@
+{
+  "name": "@domain/core",
+  "version": "1.0.0",
+  "description": "",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./errors": "./src/errors/index.ts",
+    "./utils": "./src/utils/index.ts",
+    "./value-objects": "./src/value-objects/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint src",
+    "lint:fix": "eslint src --fix",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.0"
+  }
+}

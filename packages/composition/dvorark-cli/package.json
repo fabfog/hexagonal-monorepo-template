@@ -1,0 +1,19 @@
+{
+  "name": "@composition/dvorark-cli",
+  "version": "1.0.0",
+  "description": "",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint src",
+    "lint:fix": "eslint src --fix",
+    "test": "echo \"No tests yet\" && exit 0"
+  },
+  "dependencies": {
+    "@application/dvorark-bootstrap": "workspace:*",
+    "@infrastructure/driven-dvorark-bootstrap": "workspace:*"
+  }
+}
