@@ -12,5 +12,8 @@ describe("domain package paths", () => {
     expect(domainSliceIndexRelativePath("user", "entities")).toBe(
       "packages/domain/user/src/entities/index.ts"
     );
+    expect(domainSliceIndexRelativePath("user", "errors")).toBe(
+      "packages/domain/user/src/errors/index.ts"
+    );
   });
 });

@@ -11,7 +11,7 @@ export function domainPackageJsonRelativePath(domainPackageSlug: string): string
   return `${domainPackageRootRelative(domainPackageSlug)}/package.json`;
 }
 
-export type DomainPackageSlice = "entities" | "value-objects";
+export type DomainPackageSlice = "entities" | "value-objects" | "errors";
 
 export function domainSliceIndexRelativePath(
   domainPackageSlug: string,

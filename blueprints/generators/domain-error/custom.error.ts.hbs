@@ -1,0 +1,12 @@
+import { DomainError } from "@domain/core/errors";
+
+export class {{errorClassName}} extends DomainError {
+  constructor() {
+    super({
+      code: "{{errorCodeConstant}}",
+      message: "{{errorMessageCapital}}",
+      metadata: {},
+      cause: undefined,
+    });
+  }
+}

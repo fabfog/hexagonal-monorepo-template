@@ -1,0 +1,12 @@
+import { DomainError } from "@domain/core/errors";
+
+export class {{entityPascal}}NotFoundError extends DomainError {
+  constructor(public readonly id: string) {
+    super({
+      code: "{{notFoundCodeConstant}}",
+      message: `{{entityPascal}} ${id} not found`,
+      metadata: { id },
+      cause: undefined,
+    });
+  }
+}

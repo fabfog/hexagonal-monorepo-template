@@ -6,6 +6,7 @@ import type {
 import type { GeneratorBlueprintSourcePort, GeneratorToolingDefaultsPort } from "../ports";
 import { CreateApplicationPackageUseCase } from "../use-cases/create-application-package.use-case";
 import { CreateDomainEntityUseCase } from "../use-cases/create-domain-entity.use-case";
+import { CreateDomainErrorUseCase } from "../use-cases/create-domain-error.use-case";
 import { CreateDomainPackageUseCase } from "../use-cases/create-domain-package.use-case";
 import { CreateDomainValueObjectUseCase } from "../use-cases/create-domain-value-object.use-case";
 
@@ -40,6 +41,15 @@ export class DvorarkGeneratorsModule {
 
   createDomainEntity(): CreateDomainEntityUseCase {
     return new CreateDomainEntityUseCase({
+      templateRenderer: this.infra.templateRenderer,
+      workspaceReader: this.infra.workspaceReader,
+      workspaceWriter: this.infra.workspaceWriter,
+      generatorBlueprintSource: this.infra.generatorBlueprintSource,
+    });
+  }
+
+  createDomainError(): CreateDomainErrorUseCase {
+    return new CreateDomainErrorUseCase({
       templateRenderer: this.infra.templateRenderer,
       workspaceReader: this.infra.workspaceReader,
       workspaceWriter: this.infra.workspaceWriter,

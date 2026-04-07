@@ -12,6 +12,10 @@ import {
   runGenerateDomainEntityCommand,
 } from "./commands/generate-domain-entity.command";
 import {
+  printDomainErrorNoInteractiveHint,
+  runGenerateDomainErrorCommand,
+} from "./commands/generate-domain-error.command";
+import {
   printDomainValueObjectNoInteractiveHint,
   runGenerateDomainValueObjectCommand,
 } from "./commands/generate-domain-value-object.command";
@@ -20,6 +24,7 @@ import {
   printNoInteractiveHint,
   runApplicationPackageWizard,
   runDomainEntityWizard,
+  runDomainErrorWizard,
   runDomainPackageWizard,
   runDomainValueObjectWizard,
   runGenerateMenu,
@@ -354,6 +359,84 @@ export async function runCli(): Promise<void> {
           valueObjectKind,
           ...(singleValuePrimitive !== undefined ? { singleValuePrimitive } : {}),
         });
+      }
+    );
+
+  generate
+    .command("domain-error")
+    .description("Add a DomainError subclass under packages/domain/<pkg>/src/errors/")
+    .option(
+      "--domain-package <slug>",
+      "Domain package folder under packages/domain (required in non-interactive mode)"
+    )
+    .option(
+      "--workspace <dir>",
+      "Monorepo root containing packages/domain (default: current directory)"
+    )
+    .option("--error-kind <kind>", "not-found or custom (required in non-interactive mode)")
+    .option("--entity <Pascal>", "Entity name for not-found (e.g. User)")
+    .option("--error-name <name>", "Error name segment for custom (e.g. InvalidState)")
+    .option(
+      "--no-interactive",
+      "Fail if required options are missing (CI; also respects CI / DVORARK_NO_INTERACTIVE)"
+    )
+    .action(
+      async (options: {
+        domainPackage?: string;
+        workspace?: string;
+        errorKind?: string;
+        entity?: string;
+        errorName?: string;
+        noInteractive?: boolean;
+      }): Promise<void> => {
+        const workspaceRoot = options.workspace
+          ? path.resolve(process.cwd(), options.workspace)
+          : process.cwd();
+        const domainPkg = options.domainPackage?.trim();
+        const errorKindRaw = options.errorKind?.trim();
+        const noInteractive = isNonInteractive(argv) || options.noInteractive === true;
+
+        const needsWizard =
+          !domainPkg ||
+          !errorKindRaw ||
+          (errorKindRaw === "not-found" && !options.entity?.trim()) ||
+          (errorKindRaw === "custom" && !options.errorName?.trim());
+
+        if (needsWizard) {
+          if (noInteractive) {
+            printDomainErrorNoInteractiveHint();
+            process.exit(1);
+          }
+          await runDomainErrorWizard({
+            ...(options.workspace ? { workspaceRoot } : {}),
+            ...(domainPkg ? { domainPackageSlug: domainPkg } : {}),
+          });
+          return;
+        }
+
+        if (errorKindRaw !== "not-found" && errorKindRaw !== "custom") {
+          console.error(
+            pc.red(`--error-kind must be not-found or custom (got ${JSON.stringify(errorKindRaw)})`)
+          );
+          process.exit(1);
+        }
+
+        try {
+          await runGenerateDomainErrorCommand({
+            workspaceRoot,
+            domainPackageSlugInput: domainPkg,
+            errorKind: errorKindRaw,
+            ...(errorKindRaw === "not-found"
+              ? { entityPascalInput: options.entity!.trim() }
+              : { customErrorNameInput: options.errorName!.trim() }),
+          });
+        } catch (e) {
+          if (e instanceof Error && e.message.startsWith("--")) {
+            console.error(pc.red(e.message));
+            process.exit(1);
+          }
+          throw e;
+        }
       }
     );
 
