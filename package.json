@@ -17,6 +17,7 @@
     "deps:graph:composition": "node scripts/deps-composition-graph-open.cjs",
     "deps:graph:module": "node scripts/deps-module-graph-open.cjs",
     "dvorark": "pnpm --filter dvorark-cli start",
+    "dvorark:studio": "pnpm --filter dvorark-studio dev",
     "demo:generate": "node scripts/demo/generate-demo-stack.cjs --confirm-install",
     "demo:remove": "node scripts/demo/remove-demo-stack.cjs"
   },

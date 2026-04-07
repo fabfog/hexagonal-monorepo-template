@@ -7,8 +7,28 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
-const REPO_ROOT = path.resolve(dirname, "../../../../../");
-const BLUEPRINT_ROOT = path.join(REPO_ROOT, "blueprints", "starter");
+
+function resolveBlueprintRoot(startDir: string): string {
+  let currentDir = startDir;
+
+  while (true) {
+    const candidate = path.join(currentDir, "blueprints", "starter");
+    if (fs.existsSync(candidate)) {
+      return candidate;
+    }
+
+    const parentDir = path.dirname(currentDir);
+    if (parentDir === currentDir) {
+      throw new Error(
+        `Unable to locate blueprints/starter from ${startDir}. Make sure the Dvorark repo root is reachable from the current runtime.`
+      );
+    }
+
+    currentDir = parentDir;
+  }
+}
+
+const BLUEPRINT_ROOT = resolveBlueprintRoot(dirname);
 
 function readFilesRecursively(
   rootDir: string,

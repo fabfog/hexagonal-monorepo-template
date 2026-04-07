@@ -1,4 +1,5 @@
 node_modules
+apps/dvorark-studio/out
 
 # dependency-cruiser HTML report (pnpm deps:graph)
 depcruiser-reports/
