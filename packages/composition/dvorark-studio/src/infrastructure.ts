@@ -9,6 +9,7 @@ import {
   WorkspaceWriterAdapter,
 } from "@infrastructure/driven-dvorark-bootstrap";
 import {
+  DomainWorkspaceCatalogAdapter,
   GeneratorBlueprintSourceAdapter,
   GeneratorToolingDefaultsAdapter,
 } from "@infrastructure/driven-dvorark-generators";
@@ -35,6 +36,7 @@ class DvorarkStudioInfrastructureProvider {
       workspaceInspection: this.workspaceInspection,
       generatorBlueprintSource: this.generatorBlueprintSource,
       generatorToolingDefaults: this.generatorToolingDefaults,
+      domainWorkspaceCatalog: this.domainWorkspaceCatalog,
     };
   }
 }

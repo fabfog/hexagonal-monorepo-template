@@ -3,7 +3,11 @@ import type {
   WorkspaceReaderPort,
   WorkspaceWriterPort,
 } from "@application/dvorark-bootstrap/ports";
-import type { GeneratorBlueprintSourcePort, GeneratorToolingDefaultsPort } from "../ports";
+import type {
+  DomainWorkspaceCatalogPort,
+  GeneratorBlueprintSourcePort,
+  GeneratorToolingDefaultsPort,
+} from "../ports";
 import { CreateApplicationPackageUseCase } from "../use-cases/create-application-package.use-case";
 import { CreateDomainEntityUseCase } from "../use-cases/create-domain-entity.use-case";
 import { CreateDomainErrorUseCase } from "../use-cases/create-domain-error.use-case";
@@ -11,6 +15,9 @@ import { CreateDomainServiceUseCase } from "../use-cases/create-domain-service.u
 import { CreateDomainPackageUseCase } from "../use-cases/create-domain-package.use-case";
 import { CreateDomainValueObjectUseCase } from "../use-cases/create-domain-value-object.use-case";
 import { AddDomainEntityVoFieldUseCase } from "../use-cases/add-domain-entity-vo-field.use-case";
+import { ListDomainEntityPascalNamesUseCase } from "../use-cases/list-domain-entity-pascal-names.use-case";
+import { ListDomainPackageSlugsUseCase } from "../use-cases/list-domain-package-slugs.use-case";
+import { ListVoFieldChoicesForEntityFieldUseCase } from "../use-cases/list-vo-field-choices-for-entity-field.use-case";
 
 export interface DvorarkGeneratorsInfra {
   templateRenderer: TemplateRendererPort;
@@ -18,6 +25,7 @@ export interface DvorarkGeneratorsInfra {
   workspaceWriter: WorkspaceWriterPort;
   generatorBlueprintSource: GeneratorBlueprintSourcePort;
   generatorToolingDefaults: GeneratorToolingDefaultsPort;
+  domainWorkspaceCatalog: DomainWorkspaceCatalogPort;
 }
 
 export class DvorarkGeneratorsModule {
@@ -84,6 +92,24 @@ export class DvorarkGeneratorsModule {
       workspaceReader: this.infra.workspaceReader,
       workspaceWriter: this.infra.workspaceWriter,
       generatorToolingDefaults: this.infra.generatorToolingDefaults,
+    });
+  }
+
+  listDomainPackageSlugs(): ListDomainPackageSlugsUseCase {
+    return new ListDomainPackageSlugsUseCase({
+      domainWorkspaceCatalog: this.infra.domainWorkspaceCatalog,
+    });
+  }
+
+  listDomainEntityPascalNames(): ListDomainEntityPascalNamesUseCase {
+    return new ListDomainEntityPascalNamesUseCase({
+      domainWorkspaceCatalog: this.infra.domainWorkspaceCatalog,
+    });
+  }
+
+  listVoFieldChoicesForEntityField(): ListVoFieldChoicesForEntityFieldUseCase {
+    return new ListVoFieldChoicesForEntityFieldUseCase({
+      domainWorkspaceCatalog: this.infra.domainWorkspaceCatalog,
     });
   }
 }

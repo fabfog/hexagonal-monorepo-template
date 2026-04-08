@@ -1,12 +1,10 @@
 import path from "node:path";
 
 import pc from "picocolors";
+import { getDvorarkCliModules } from "@composition/dvorark-cli";
 
 import { runGenerateDomainEntityAddVoFieldCommand } from "../../../commands/generate-domain-entity-add-vo-field.command";
 import { promptSelect, promptText } from "../../prompts";
-import { listDomainEntityPascalNames } from "./list-domain-entities";
-import { listDomainPackageSlugs } from "./list-domain-packages";
-import { listVoFieldChoices } from "./list-domain-vo-field-choices";
 
 export interface DomainEntityAddVoFieldWizardInput {
   workspaceRoot?: string;
@@ -30,9 +28,14 @@ export async function runDomainEntityAddVoFieldWizard(
     workspaceRoot = path.resolve(workspaceRoot);
   }
 
+  const dvorarkGenerators = getDvorarkCliModules({}).dvorarkGenerators;
+
   let domainPackageSlug = partial.domainPackageSlug?.trim();
   if (!domainPackageSlug) {
-    const choices = listDomainPackageSlugs(workspaceRoot, { excludeCore: false });
+    const choices = await dvorarkGenerators.listDomainPackageSlugs().execute({
+      workspaceRoot,
+      excludeCore: false,
+    });
     if (choices.length === 0) {
       console.error(pc.red("No domain packages under packages/domain."));
       return;
@@ -43,9 +46,15 @@ export async function runDomainEntityAddVoFieldWizard(
     });
   }
 
+  if (!domainPackageSlug) {
+    return;
+  }
+
   let entityPascal = partial.entityPascal?.trim();
   if (!entityPascal) {
-    const entityChoices = listDomainEntityPascalNames(workspaceRoot, domainPackageSlug);
+    const entityChoices = await dvorarkGenerators
+      .listDomainEntityPascalNames()
+      .execute({ workspaceRoot, domainPackageSlug });
     if (entityChoices.length === 0) {
       console.error(
         pc.red(
@@ -56,7 +65,7 @@ export async function runDomainEntityAddVoFieldWizard(
     }
     entityPascal = await promptSelect({
       message: "Entity",
-      options: entityChoices.map((name) => ({ value: name, label: name })),
+      options: entityChoices.map((name: string) => ({ value: name, label: name })),
     });
   }
 
@@ -80,7 +89,13 @@ export async function runDomainEntityAddVoFieldWizard(
     ).trim();
   }
 
-  const voChoices = listVoFieldChoices(workspaceRoot, domainPackageSlug);
+  if (!domainPackageSlug || !entityPascal || !propertyName) {
+    return;
+  }
+
+  const voChoices = await dvorarkGenerators
+    .listVoFieldChoicesForEntityField()
+    .execute({ workspaceRoot, entityDomainPackage: domainPackageSlug });
   if (voChoices.length === 0) {
     console.error(
       pc.red(

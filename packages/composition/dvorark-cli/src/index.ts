@@ -28,6 +28,7 @@ export function getDvorarkCliModules(ctx: RequestContext) {
       workspaceWriter: infrastructure.workspaceWriter,
       generatorBlueprintSource: infrastructure.generatorBlueprintSource,
       generatorToolingDefaults: infrastructure.generatorToolingDefaults,
+      domainWorkspaceCatalog: infrastructure.domainWorkspaceCatalog,
     }),
   };
 }

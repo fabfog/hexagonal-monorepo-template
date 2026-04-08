@@ -1,10 +1,10 @@
 import path from "node:path";
 
 import pc from "picocolors";
+import { getDvorarkCliModules } from "@composition/dvorark-cli";
 
 import { runGenerateDomainErrorCommand } from "../../../commands/generate-domain-error.command";
 import { promptSelect, promptText } from "../../prompts";
-import { listDomainPackageSlugs } from "./list-domain-packages";
 
 const ENTITY_PASCAL_RE = /^[A-Z][a-zA-Z0-9]*$/;
 
@@ -28,7 +28,9 @@ export async function runDomainErrorWizard(partial: DomainErrorWizardInput = {})
 
   let domainPackageSlug = partial.domainPackageSlug?.trim();
   if (!domainPackageSlug) {
-    const choices = listDomainPackageSlugs(workspaceRoot, { excludeCore: false });
+    const choices = await getDvorarkCliModules({})
+      .dvorarkGenerators.listDomainPackageSlugs()
+      .execute({ workspaceRoot, excludeCore: false });
     if (choices.length === 0) {
       console.error(
         pc.red(

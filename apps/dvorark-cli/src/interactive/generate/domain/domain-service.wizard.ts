@@ -1,11 +1,10 @@
 import path from "node:path";
 
 import pc from "picocolors";
+import { getDvorarkCliModules } from "@composition/dvorark-cli";
 
 import { runGenerateDomainServiceCommand } from "../../../commands/generate-domain-service.command";
 import { promptMultiselect, promptSelect, promptText } from "../../prompts";
-import { listDomainEntityPascalNames } from "./list-domain-entities";
-import { listDomainPackageSlugs } from "./list-domain-packages";
 
 export interface DomainServiceWizardInput {
   workspaceRoot?: string;
@@ -27,9 +26,14 @@ export async function runDomainServiceWizard(
     workspaceRoot = path.resolve(workspaceRoot);
   }
 
+  const dvorarkGenerators = getDvorarkCliModules({}).dvorarkGenerators;
+
   let domainPackageSlug = partial.domainPackageSlug?.trim();
   if (!domainPackageSlug) {
-    const choices = listDomainPackageSlugs(workspaceRoot, { excludeCore: true });
+    const choices = await dvorarkGenerators.listDomainPackageSlugs().execute({
+      workspaceRoot,
+      excludeCore: true,
+    });
     if (choices.length === 0) {
       console.error(
         pc.red(
@@ -44,7 +48,9 @@ export async function runDomainServiceWizard(
     });
   }
 
-  const entityChoices = listDomainEntityPascalNames(workspaceRoot, domainPackageSlug);
+  const entityChoices = await dvorarkGenerators
+    .listDomainEntityPascalNames()
+    .execute({ workspaceRoot, domainPackageSlug });
   if (entityChoices.length === 0) {
     console.error(
       pc.red(

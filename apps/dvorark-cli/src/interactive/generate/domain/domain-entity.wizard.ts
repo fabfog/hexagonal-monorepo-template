@@ -1,10 +1,10 @@
 import path from "node:path";
 
 import pc from "picocolors";
+import { getDvorarkCliModules } from "@composition/dvorark-cli";
 
 import { runGenerateDomainEntityCommand } from "../../../commands/generate-domain-entity.command";
 import { promptSelect, promptText } from "../../prompts";
-import { listDomainPackageSlugs } from "./list-domain-packages";
 
 export interface DomainEntityWizardInput {
   workspaceRoot?: string;
@@ -27,7 +27,9 @@ export async function runDomainEntityWizard(partial: DomainEntityWizardInput = {
 
   let domainPackageSlug = partial.domainPackageSlug?.trim();
   if (!domainPackageSlug) {
-    const choices = listDomainPackageSlugs(workspaceRoot);
+    const choices = await getDvorarkCliModules({})
+      .dvorarkGenerators.listDomainPackageSlugs()
+      .execute({ workspaceRoot });
     if (choices.length === 0) {
       console.error(
         pc.red(

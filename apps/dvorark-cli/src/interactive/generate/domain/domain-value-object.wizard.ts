@@ -1,10 +1,10 @@
 import path from "node:path";
 
 import pc from "picocolors";
+import { getDvorarkCliModules } from "@composition/dvorark-cli";
 
 import { runGenerateDomainValueObjectCommand } from "../../../commands/generate-domain-value-object.command";
 import { promptSelect, promptText } from "../../prompts";
-import { listDomainPackageSlugs } from "./list-domain-packages";
 
 export interface DomainValueObjectWizardInput {
   workspaceRoot?: string;
@@ -29,7 +29,9 @@ export async function runDomainValueObjectWizard(
 
   let domainPackageSlug = partial.domainPackageSlug?.trim();
   if (!domainPackageSlug) {
-    const choices = listDomainPackageSlugs(workspaceRoot, { excludeCore: false });
+    const choices = await getDvorarkCliModules({})
+      .dvorarkGenerators.listDomainPackageSlugs()
+      .execute({ workspaceRoot, excludeCore: false });
     if (choices.length === 0) {
       console.error(
         pc.red(
