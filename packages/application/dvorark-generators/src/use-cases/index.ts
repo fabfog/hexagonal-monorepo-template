@@ -8,6 +8,7 @@ export * from "./create-domain-error.use-case";
 export * from "./create-domain-service.use-case";
 export * from "./create-domain-value-object.use-case";
 export * from "./create-domain-package.use-case";
+export * from "./create-ui-package.use-case";
 export type {
   CreateDomainValueObjectInputDto,
   SingleValuePrimitive,
@@ -19,3 +20,4 @@ export type { ListDomainPackageSlugsInputDto } from "../dto/list-domain-package-
 export type { ListVoFieldChoicesForEntityFieldInputDto } from "../dto/list-vo-field-choices-for-entity-field.dto";
 export type { CreateDomainErrorInputDto, DomainErrorKind } from "../dto/create-domain-error.dto";
 export type { CreateDomainServiceInputDto } from "../dto/create-domain-service.dto";
+export type { CreateUiPackageInputDto } from "../dto/create-ui-package.dto";

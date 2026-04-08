@@ -3,7 +3,6 @@ import { z } from "zod";
 
 /**
  * Lowercase alphanumeric segments separated by single hyphens (`packages/application/<slug>`, `@application/<slug>`).
- * Same validation rules as `DomainPackageSlug`; distinct type for the application layer.
  */
 export const ApplicationPackageSlugSchema = z
   .string()

@@ -29,9 +29,11 @@ import {
   runGenerateDomainValueObjectCommand,
 } from "./commands/generate-domain-value-object.command";
 import { runGenerateDomainPackageCommand } from "./commands/generate-domain-package.command";
+import { runGenerateUiPackageCommand } from "./commands/generate-ui-package.command";
 import {
   printNoInteractiveHint,
   runApplicationPackageWizard,
+  runUiPackageWizard,
   runDomainEntityAddVoFieldWizard,
   runDomainEntityWizard,
   runDomainErrorWizard,
@@ -226,6 +228,53 @@ export async function runCli(): Promise<void> {
         }
 
         await runGenerateApplicationPackageCommand({
+          workspaceRoot,
+          packageSlugInput: slug,
+          ...(options.vitest !== undefined ? { vitestVersionOverride: options.vitest } : {}),
+        });
+      }
+    );
+
+  generate
+    .command("ui-package")
+    .description("Create a new @ui/* package under packages/ui")
+    .argument(
+      "[package-slug]",
+      "Package segment (e.g. react, editor-shell); omit to prompt interactively"
+    )
+    .option(
+      "--workspace <dir>",
+      "Monorepo root containing packages/ui (default: current directory)"
+    )
+    .option("--vitest <range>", "Override vitest devDependency range in generated package.json")
+    .option(
+      "--no-interactive",
+      "Fail if slug is missing (CI; also respects CI / DVORARK_NO_INTERACTIVE)"
+    )
+    .action(
+      async (
+        packageSlug: string | undefined,
+        options: { workspace?: string; vitest?: string; noInteractive?: boolean }
+      ): Promise<void> => {
+        const workspaceRoot = options.workspace
+          ? path.resolve(process.cwd(), options.workspace)
+          : process.cwd();
+        const slug = packageSlug?.trim();
+        const noInteractive = isNonInteractive(argv) || options.noInteractive === true;
+
+        if (!slug) {
+          if (noInteractive) {
+            printNoInteractiveHint();
+            process.exit(1);
+          }
+          await runUiPackageWizard({
+            ...(options.workspace ? { workspaceRoot } : {}),
+            ...(options.vitest !== undefined ? { vitestVersionOverride: options.vitest } : {}),
+          });
+          return;
+        }
+
+        await runGenerateUiPackageCommand({
           workspaceRoot,
           packageSlugInput: slug,
           ...(options.vitest !== undefined ? { vitestVersionOverride: options.vitest } : {}),

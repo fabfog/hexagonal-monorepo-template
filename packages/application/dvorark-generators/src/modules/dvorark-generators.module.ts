@@ -14,6 +14,7 @@ import { CreateDomainErrorUseCase } from "../use-cases/create-domain-error.use-c
 import { CreateDomainServiceUseCase } from "../use-cases/create-domain-service.use-case";
 import { CreateDomainPackageUseCase } from "../use-cases/create-domain-package.use-case";
 import { CreateDomainValueObjectUseCase } from "../use-cases/create-domain-value-object.use-case";
+import { CreateUiPackageUseCase } from "../use-cases/create-ui-package.use-case";
 import { AddDomainEntityVoFieldUseCase } from "../use-cases/add-domain-entity-vo-field.use-case";
 import { ListDomainEntityPascalNamesUseCase } from "../use-cases/list-domain-entity-pascal-names.use-case";
 import { ListDomainPackageSlugsUseCase } from "../use-cases/list-domain-package-slugs.use-case";
@@ -42,6 +43,15 @@ export class DvorarkGeneratorsModule {
 
   createDomainPackage(): CreateDomainPackageUseCase {
     return new CreateDomainPackageUseCase({
+      templateRenderer: this.infra.templateRenderer,
+      workspaceWriter: this.infra.workspaceWriter,
+      generatorBlueprintSource: this.infra.generatorBlueprintSource,
+      generatorToolingDefaults: this.infra.generatorToolingDefaults,
+    });
+  }
+
+  createUiPackage(): CreateUiPackageUseCase {
+    return new CreateUiPackageUseCase({
       templateRenderer: this.infra.templateRenderer,
       workspaceWriter: this.infra.workspaceWriter,
       generatorBlueprintSource: this.infra.generatorBlueprintSource,

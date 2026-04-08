@@ -1,5 +1,7 @@
 export type { ApplicationPackageWizardInput } from "./generate/application";
 export { runApplicationMenu, runApplicationPackageWizard } from "./generate/application";
+export type { UiPackageWizardInput } from "./generate/ui";
+export { runUiMenu, runUiPackageWizard } from "./generate/ui";
 export type {
   DomainEntityAddVoFieldWizardInput,
   DomainEntityWizardInput,
