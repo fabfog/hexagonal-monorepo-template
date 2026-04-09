@@ -2,3 +2,9 @@ node_modules
 
 # dependency-cruiser HTML report (pnpm deps:graph)
 depcruiser-reports/
+
+analysis
+
+.nx/cache
+.nx/workspace-data
+vitest.config.*.timestamp*

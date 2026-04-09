@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/schema",
+  "cli": "nx",
+  "title": "hello",
+  "type": "object",
+  "properties": {
+    "message": {
+      "type": "string",
+      "description": "Optional label printed by the generator",
+      "default": "nx",
+      "x-prompt": "Message to log"
+    }
+  },
+  "required": []
+}

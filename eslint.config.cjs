@@ -1,3 +1,8 @@
 const baseConfig = require("@repo/config-eslint").default;
 
-module.exports = [...baseConfig];
+module.exports = [
+  ...baseConfig,
+  {
+    ignores: ["**/vitest.config.*.timestamp*"],
+  },
+];

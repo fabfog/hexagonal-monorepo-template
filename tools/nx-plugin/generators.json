@@ -1,0 +1,9 @@
+{
+  "generators": {
+    "hello": {
+      "factory": "./src/generators/hello/generator.cjs#helloGenerator",
+      "schema": "./src/generators/hello/schema.json",
+      "description": "Smoke-test generator for the local Nx plugin (placeholder for future Plop migrations)."
+    }
+  }
+}

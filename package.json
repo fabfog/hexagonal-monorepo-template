@@ -10,7 +10,8 @@
     "test": "vitest run",
     "test:watch": "vitest --watch",
     "test:coverage": "vitest run --coverage",
-    "prepare": "husky install",
+    "graph": "nx graph",
+    "prepare": "husky",
     "deps:renovate": "npx -p renovate renovate-config-validator renovate.json",
     "deps:lint": "depcruise --config .dependency-cruiser.cjs packages -T err-long",
     "deps:graph": "node scripts/deps-graph-html-open.cjs",
@@ -20,6 +21,9 @@
     "demo:remove": "node scripts/demo/remove-demo-stack.cjs"
   },
   "devDependencies": {
+    "@nx/eslint": "22.6.4",
+    "@nx/vitest": "22.6.4",
+    "@repo/nx-plugin": "workspace:^",
     "@repo/config-eslint": "workspace:^",
     "@repo/config-vitest": "workspace:^",
     "@types/node": "^25.5.0",
@@ -29,9 +33,11 @@
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",
     "node-plop": "^0.32.3",
+    "nx": "22.6.4",
     "plop": "^4.0.5",
     "prettier": "^3.4.2",
     "typescript": "^5.7.3",
+    "vite": "^8.0.0",
     "vitest": "^4.1.0"
   },
   "lint-staged": {
@@ -42,8 +48,40 @@
       "prettier --write"
     ]
   },
-  "packageManager": "pnpm@9.15.0",
+  "packageManager": "pnpm@10.33.0",
   "engines": {
-    "node": ">=22 <23"
+    "node": ">=25 <26"
+  },
+  "nx": {
+    "targets": {
+      "deps-graph": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "node scripts/deps-graph-html-open.cjs",
+          "cwd": "."
+        }
+      },
+      "deps-graph-composition": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "node scripts/deps-composition-graph-open.cjs",
+          "cwd": "."
+        }
+      },
+      "deps-graph-module": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "node scripts/deps-module-graph-open.cjs",
+          "cwd": "."
+        }
+      },
+      "deps-lint": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "depcruise --config .dependency-cruiser.cjs packages -T err-long",
+          "cwd": "."
+        }
+      }
+    }
   }
 }

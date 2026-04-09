@@ -4,8 +4,8 @@ pnpm-based monorepo designed for a hexagonal architecture (Domain / Application 
 
 ### Requirements
 
-- Node.js >=22, <23
-- pnpm 9.x
+- Node.js >=25, <26
+- pnpm 10.x (see [`packageManager`](./package.json) in `package.json`)
 
 ### Setup
 
@@ -27,6 +27,8 @@ pnpm install
 Optional: validate config locally with `npx -p renovate renovate-config-validator renovate.json` (downloads the `renovate` package on first run).
 
 ### Root scripts
+
+**Nx** — This repo uses [Nx](https://nx.dev) for the **project graph** and optional task runs. Open the visual graph with `pnpm graph` (`nx graph`). Workspace packages are registered as Nx projects; you can also run dependency tooling via Nx, e.g. `pnpm exec nx run hexagonal-monorepo-template:deps-graph` (same scripts as `pnpm deps:graph`, plus targets `deps-graph-composition`, `deps-graph-module`, `deps-lint`). Local code generators live in [`tools/nx-plugin`](./tools/nx-plugin) (`@repo/nx-plugin`); defaults are set in [`nx.json`](./nx.json) under `generators`. Try: `pnpm exec nx g @repo/nx-plugin:hello --dry-run`.
 
 - `pnpm lint` – Run ESLint on the whole monorepo (with architectural constraints)
 - `pnpm lint:fix` – ESLint with auto-fix where possible
