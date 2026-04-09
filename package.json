@@ -4,7 +4,7 @@
   "scripts": {
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "plop": "plop --plopfile plop/plopfile.cjs",
+    "plop": "tsx ./node_modules/plop/bin/plop.js --plopfile plop/plopfile.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
@@ -16,21 +16,24 @@
     "deps:graph": "node scripts/deps-graph-html-open.cjs",
     "deps:graph:composition": "node scripts/deps-composition-graph-open.cjs",
     "deps:graph:module": "node scripts/deps-module-graph-open.cjs",
-    "demo:generate": "node scripts/demo/generate-demo-stack.cjs --confirm-install",
-    "demo:remove": "node scripts/demo/remove-demo-stack.cjs"
+    "demo:generate": "tsx scripts/demo/generate-demo-stack.ts --confirm-install",
+    "demo:remove": "tsx scripts/demo/remove-demo-stack.ts"
   },
   "devDependencies": {
     "@repo/config-eslint": "workspace:^",
     "@repo/config-vitest": "workspace:^",
+    "@types/inquirer": "^9.0.9",
     "@types/node": "^25.5.0",
     "@vitest/coverage-v8": "^4.1.0",
     "dependency-cruiser": "^17.3.10",
     "eslint-config-prettier": "^10.1.8",
     "husky": "^9.1.7",
+    "inquirer": "^9.3.8",
     "lint-staged": "^16.4.0",
     "node-plop": "^0.32.3",
     "plop": "^4.0.5",
     "prettier": "^3.4.2",
+    "tsx": "^4.21.0",
     "typescript": "^5.7.3",
     "vitest": "^4.1.0"
   },

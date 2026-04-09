@@ -1,16 +1,6 @@
 import path from "node:path";
-import { createRequire } from "node:module";
 import { describe, expect, it } from "vitest";
-
-const require = createRequire(import.meta.url);
-const { generateApplicationEntityMapperSources } = require("./entity-to-dto-map-codegen.cjs") as {
-  generateApplicationEntityMapperSources: (opts: {
-    repoRoot: string;
-    domainPackage: string;
-    entityBasePascal: string;
-    applicationPackage: string;
-  }) => { dtoSource: string; mapperSource: string; testSource: string };
-};
+import { generateApplicationEntityMapperSources } from "./entity-to-dto-map-codegen.ts";
 
 const repoRoot = path.join(import.meta.dirname, "..", "fixtures", "entity-to-dto-codegen", "repo");
 
