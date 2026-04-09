@@ -4,8 +4,8 @@ pnpm-based monorepo designed for a hexagonal architecture (Domain / Application 
 
 ### Requirements
 
-- Node.js >=22, <23
-- pnpm 9.x
+- Node.js >=25, <26
+- pnpm 9.x (see `packageManager` in `package.json`)
 
 ### Setup
 

@@ -10,7 +10,7 @@
     "test": "vitest run",
     "test:watch": "vitest --watch",
     "test:coverage": "vitest run --coverage",
-    "prepare": "husky install",
+    "prepare": "husky",
     "deps:renovate": "npx -p renovate renovate-config-validator renovate.json",
     "deps:lint": "depcruise --config .dependency-cruiser.cjs packages -T err-long",
     "deps:graph": "node scripts/deps-graph-html-open.cjs",
@@ -44,6 +44,6 @@
   },
   "packageManager": "pnpm@9.15.0",
   "engines": {
-    "node": ">=22 <23"
+    "node": ">=25 <26"
   }
 }
