@@ -29,10 +29,12 @@ import {
   runGenerateDomainValueObjectCommand,
 } from "./commands/generate-domain-value-object.command";
 import { runGenerateDomainPackageCommand } from "./commands/generate-domain-package.command";
+import { runGenerateCompositionPackageCommand } from "./commands/generate-composition-package.command";
 import { runGenerateUiPackageCommand } from "./commands/generate-ui-package.command";
 import {
   printNoInteractiveHint,
   runApplicationPackageWizard,
+  runCompositionPackageWizard,
   runUiPackageWizard,
   runDomainEntityAddVoFieldWizard,
   runDomainEntityWizard,
@@ -93,7 +95,7 @@ export async function runCli(): Promise<void> {
     if (isNonInteractive(argv)) {
       console.error(
         pc.red(
-          "Interactive mode disabled. Run e.g. dvorark generate domain-package <slug> or generate application-package <slug>, or unset CI / DVORARK_NO_INTERACTIVE."
+          "Interactive mode disabled. Run e.g. dvorark generate domain-package <slug>, generate application-package <slug>, generate composition-package <slug>, or unset CI / DVORARK_NO_INTERACTIVE."
         )
       );
       process.exit(1);
@@ -111,7 +113,7 @@ export async function runCli(): Promise<void> {
     if (isNonInteractive(argv)) {
       console.error(
         pc.red(
-          "Interactive mode disabled. Run e.g. dvorark generate domain-package <slug> or generate application-package <slug>, or unset CI / DVORARK_NO_INTERACTIVE."
+          "Interactive mode disabled. Run e.g. dvorark generate domain-package <slug>, generate application-package <slug>, generate composition-package <slug>, or unset CI / DVORARK_NO_INTERACTIVE."
         )
       );
       process.exit(1);
@@ -278,6 +280,50 @@ export async function runCli(): Promise<void> {
           workspaceRoot,
           packageSlugInput: slug,
           ...(options.vitest !== undefined ? { vitestVersionOverride: options.vitest } : {}),
+        });
+      }
+    );
+
+  generate
+    .command("composition-package")
+    .description("Create a new @composition/* package under packages/composition")
+    .argument(
+      "[package-slug]",
+      "Package segment (e.g. web, api-shell); omit to prompt interactively"
+    )
+    .option(
+      "--workspace <dir>",
+      "Monorepo root containing packages/composition (default: current directory)"
+    )
+    .option(
+      "--no-interactive",
+      "Fail if slug is missing (CI; also respects CI / DVORARK_NO_INTERACTIVE)"
+    )
+    .action(
+      async (
+        packageSlug: string | undefined,
+        options: { workspace?: string; noInteractive?: boolean }
+      ): Promise<void> => {
+        const workspaceRoot = options.workspace
+          ? path.resolve(process.cwd(), options.workspace)
+          : process.cwd();
+        const slug = packageSlug?.trim();
+        const noInteractive = isNonInteractive(argv) || options.noInteractive === true;
+
+        if (!slug) {
+          if (noInteractive) {
+            printNoInteractiveHint();
+            process.exit(1);
+          }
+          await runCompositionPackageWizard({
+            ...(options.workspace ? { workspaceRoot } : {}),
+          });
+          return;
+        }
+
+        await runGenerateCompositionPackageCommand({
+          workspaceRoot,
+          packageSlugInput: slug,
         });
       }
     );

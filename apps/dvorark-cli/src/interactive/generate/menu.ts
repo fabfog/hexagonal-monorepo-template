@@ -1,5 +1,6 @@
 import { promptSelect } from "../prompts";
 import { runApplicationMenu } from "./application/menu";
+import { runCompositionMenu } from "./composition/menu";
 import { runUiMenu } from "./ui/menu";
 import { runDomainMenu } from "./domain/menu";
 
@@ -11,6 +12,7 @@ export async function runGenerateMenu(targetDirectory: string): Promise<void> {
         { value: "domain", label: "Domain" },
         { value: "application", label: "Application" },
         { value: "ui", label: "UI" },
+        { value: "composition", label: "Composition" },
         { value: "back", label: "Back" },
       ],
     });
@@ -29,6 +31,10 @@ export async function runGenerateMenu(targetDirectory: string): Promise<void> {
 
     if (choice === "ui") {
       await runUiMenu(targetDirectory);
+    }
+
+    if (choice === "composition") {
+      await runCompositionMenu(targetDirectory);
     }
   }
 }

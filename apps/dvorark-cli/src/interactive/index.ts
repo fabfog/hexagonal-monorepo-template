@@ -1,5 +1,7 @@
 export type { ApplicationPackageWizardInput } from "./generate/application";
 export { runApplicationMenu, runApplicationPackageWizard } from "./generate/application";
+export type { CompositionPackageWizardInput } from "./generate/composition";
+export { runCompositionMenu, runCompositionPackageWizard } from "./generate/composition";
 export type { UiPackageWizardInput } from "./generate/ui";
 export { runUiMenu, runUiPackageWizard } from "./generate/ui";
 export type {

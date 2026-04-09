@@ -9,5 +9,18 @@
   "editor.formatOnSave": true,
   "editor.codeActionsOnSave": {
     "source.fixAll.eslint": "explicit"
+  },
+  "material-icon-theme.files.associations": {},
+  "material-icon-theme.folders.associations": {
+    "domain": "core",
+    "entities": "class",
+    "value-objects": "constant",
+    "use-cases": "controller",
+    "repository": "database",
+    "infrastructure": "resource",
+    "ports": "interface",
+    "mappers": "converter",
+    "errors": "error",
+    "composition": "plugin"
   }
 }
