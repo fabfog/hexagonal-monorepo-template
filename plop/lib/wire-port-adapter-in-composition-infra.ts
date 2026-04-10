@@ -3,6 +3,7 @@ import path from "node:path";
 import { toPascalCase } from "./casing.ts";
 import { appendImportsIfMissing } from "./module-wire-ast.ts";
 import { findImportModuleForIdentifier } from "./scan-infrastructure-port-implementations.ts";
+import { createPlopMorphProject } from "./ts-morph-project.ts";
 import {
   ts,
   assertNoConflictingMembers,
@@ -28,13 +29,8 @@ export interface WirePortAdapterOpts {
  */
 function buildPortTypeImportLine(adapterFileAbsPath: string, portInterfaceName: string) {
   const text = fs.readFileSync(adapterFileAbsPath, "utf8");
-  const sf = ts.createSourceFile(
-    adapterFileAbsPath,
-    text,
-    ts.ScriptTarget.Latest,
-    true,
-    ts.ScriptKind.TS
-  );
+  const project = createPlopMorphProject({ useInMemoryFileSystem: true });
+  const sf = project.createSourceFile(adapterFileAbsPath, text, { overwrite: true });
   const resolved = findImportModuleForIdentifier(sf, portInterfaceName);
   if (!resolved) {
     throw new Error(
@@ -234,13 +230,8 @@ function ensureCompositionDependsOnApplicationForPortImport(
   portInterfaceName: string
 ) {
   const text = fs.readFileSync(adapterFileAbsPath, "utf8");
-  const sf = ts.createSourceFile(
-    adapterFileAbsPath,
-    text,
-    ts.ScriptTarget.Latest,
-    true,
-    ts.ScriptKind.TS
-  );
+  const project = createPlopMorphProject({ useInMemoryFileSystem: true });
+  const sf = project.createSourceFile(adapterFileAbsPath, text, { overwrite: true });
   const resolved = findImportModuleForIdentifier(sf, portInterfaceName);
   if (!resolved?.moduleSpecifier?.startsWith("@application/")) {
     return;

@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
-import ts from "typescript";
+import type { ClassDeclaration, SourceFile } from "ts-morph";
+import { createPlopMorphProject } from "./ts-morph-project.ts";
 /**
  * @param {string} dir
  * @returns {string[]}
@@ -31,22 +32,18 @@ function walkTsSourceFiles(dir: string) {
   }
   return out.sort();
 }
-/**
- * @param {ts.ClassDeclaration} classDecl
- * @returns {number}
- */
-function countRequiredConstructorParameters(classDecl: ts.ClassDeclaration) {
-  for (const member of classDecl.members) {
-    if (!ts.isConstructorDeclaration(member)) continue;
-    let n = 0;
-    for (const p of member.parameters) {
-      if (p.dotDotDotToken) continue;
-      if (p.questionToken || p.initializer) continue;
-      n++;
-    }
-    return n;
+function countRequiredConstructorParameters(classDecl: ClassDeclaration) {
+  const ctor = classDecl.getConstructors()[0];
+  if (!ctor) {
+    return 0;
   }
-  return 0;
+  let n = 0;
+  for (const p of ctor.getParameters()) {
+    if (p.isRestParameter()) continue;
+    if (p.isOptional()) continue;
+    n++;
+  }
+  return n;
 }
 /**
  * True if `name` looks like an application port contract (normal or interaction).
@@ -55,28 +52,21 @@ function countRequiredConstructorParameters(classDecl: ts.ClassDeclaration) {
 function isPortInterfaceName(name: string) {
   return /(?:InteractionPort|Port)$/.test(name);
 }
-/**
- * @param {ts.SourceFile} sf
- * @param {string} identifierText
- * @returns {{ moduleSpecifier: string, isTypeOnly: boolean } | null}
- */
-function findImportModuleForIdentifier(sf: ts.SourceFile, identifierText: string) {
-  for (const stmt of sf.statements) {
-    if (!ts.isImportDeclaration(stmt) || !stmt.importClause) continue;
-    const spec = stmt.moduleSpecifier;
-    if (!ts.isStringLiteral(spec)) continue;
-    const mod = spec.text;
-    const typeOnly = !!stmt.importClause.isTypeOnly;
-    if (stmt.importClause.name && stmt.importClause.name.text === identifierText) {
-      return { moduleSpecifier: mod, isTypeOnly: typeOnly };
+function findImportModuleForIdentifier(sf: SourceFile, identifierText: string) {
+  for (const decl of sf.getImportDeclarations()) {
+    const moduleSpecifier = decl.getModuleSpecifierValue();
+    if (!moduleSpecifier) continue;
+
+    const defaultImport = decl.getDefaultImport()?.getText();
+    if (defaultImport === identifierText) {
+      return { moduleSpecifier, isTypeOnly: decl.isTypeOnly() };
     }
-    const nb = stmt.importClause.namedBindings;
-    if (nb && ts.isNamedImports(nb)) {
-      for (const el of nb.elements) {
-        const bindName = el.propertyName ? el.propertyName.text : el.name.text;
-        if (el.name.text === identifierText || bindName === identifierText) {
-          return { moduleSpecifier: mod, isTypeOnly: typeOnly };
-        }
+
+    for (const namedImport of decl.getNamedImports()) {
+      const importName = namedImport.getNameNode().getText();
+      const aliasName = namedImport.getAliasNode()?.getText();
+      if (importName === identifierText || aliasName === identifierText) {
+        return { moduleSpecifier, isTypeOnly: decl.isTypeOnly() || namedImport.isTypeOnly() };
       }
     }
   }
@@ -110,31 +100,28 @@ function scanPortImplementations(repoRoot: string, infraFolder: string) {
   }
   const srcRoot = path.join(pkgDir, "src");
   const files = walkTsSourceFiles(srcRoot);
+  const project = createPlopMorphProject({ useInMemoryFileSystem: true });
   const out: PortImplementationChoice[] = [];
   for (const abs of files) {
     const text = fs.readFileSync(abs, "utf8");
-    const sf = ts.createSourceFile(abs, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
-    for (const stmt of sf.statements) {
-      if (!ts.isClassDeclaration(stmt) || !stmt.name) continue;
-      const isExported = stmt.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
-      if (!isExported) continue;
-      if (!stmt.heritageClauses) continue;
-      for (const hc of stmt.heritageClauses) {
-        if (hc.token !== ts.SyntaxKind.ImplementsKeyword) continue;
-        for (const t of hc.types) {
-          const portName = t.expression.getText(sf);
-          if (!isPortInterfaceName(portName)) continue;
-          const rel = path.relative(srcRoot, abs).replace(/\\/g, "/");
-          out.push({
-            className: stmt.name.text,
-            portInterfaceName: portName,
-            relativePath: rel,
-            absolutePath: abs,
-            infraFolder,
-            npmPackageName,
-            requiredConstructorParams: countRequiredConstructorParameters(stmt),
-          });
-        }
+    const sf = project.createSourceFile(abs, text, { overwrite: true });
+    for (const classDecl of sf.getClasses()) {
+      const className = classDecl.getName();
+      if (!className) continue;
+      if (!classDecl.isExported()) continue;
+      for (const impl of classDecl.getImplements()) {
+        const portName = impl.getText();
+        if (!isPortInterfaceName(portName)) continue;
+        const rel = path.relative(srcRoot, abs).replace(/\\/g, "/");
+        out.push({
+          className,
+          portInterfaceName: portName,
+          relativePath: rel,
+          absolutePath: abs,
+          infraFolder,
+          npmPackageName,
+          requiredConstructorParams: countRequiredConstructorParameters(classDecl),
+        });
       }
     }
   }
