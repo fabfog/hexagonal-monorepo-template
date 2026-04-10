@@ -28,5 +28,11 @@ describe("generateApplicationEntityMapperSources", () => {
     expect(out.testSource).toContain("toEqual");
     expect(out.testSource).toContain("new TicketEntity(");
     expect(out.testSource).not.toMatch(/as unknown/);
+
+    expect(out.dtoSource.indexOf("id:")).toBeLessThan(out.dtoSource.indexOf("title:"));
+
+    expect(out.testSource).toContain("@domain/fixture-codegen-entity/entities");
+    expect(out.testSource).toContain("TicketId");
+    expect(out.testSource).toContain("FixtureLocale");
   });
 });

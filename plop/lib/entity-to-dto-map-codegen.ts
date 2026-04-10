@@ -1,9 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
-import ts from "typescript";
+import { ts } from "ts-morph";
 import { toKebabCase, toPascalCase } from "./casing.ts";
 import { packagePath } from "./packages.ts";
+import { createPlopMorphProject, PLOP_MORPH_COMPILER_OPTIONS } from "./ts-morph-project.ts";
 
 const nodeRequire = createRequire(import.meta.url);
 
@@ -786,27 +787,22 @@ function generateApplicationEntityMapperSources(opts: GenerateApplicationEntityM
   }
   const domainPackageDir = packagePath(repoRoot, "domain", domainPackage);
   const pathMapping = buildCompilerPathsForDomainPackage(repoRoot, domainPackageDir);
-  /** @type {ts.CompilerOptions} */
-  const compilerOptions = {
-    target: ts.ScriptTarget.ES2022,
-    module: ts.ModuleKind.ESNext,
-    moduleResolution: ts.ModuleResolutionKind.Bundler,
-    strict: true,
-    skipLibCheck: true,
-    noEmit: true,
-    esModuleInterop: true,
-    isolatedModules: true,
-    noUncheckedIndexedAccess: true,
-    exactOptionalPropertyTypes: true,
-    baseUrl: repoRoot,
-    paths: pathMapping,
-  };
-  const program = ts.createProgram(rootNames, compilerOptions);
-  const checker = program.getTypeChecker();
-  const sf = program.getSourceFile(entityPath);
-  if (!sf) {
+  const project = createPlopMorphProject({
+    compilerOptions: {
+      ...PLOP_MORPH_COMPILER_OPTIONS,
+      baseUrl: repoRoot,
+      paths: pathMapping,
+    },
+  });
+  for (const filePath of rootNames) {
+    project.addSourceFileAtPath(filePath);
+  }
+  const checker = project.getTypeChecker().compilerObject;
+  const morphEntityFile = project.getSourceFile(entityPath);
+  if (!morphEntityFile) {
     throw new Error(`TypeScript program did not load ${entityPath}`);
   }
+  const sf = morphEntityFile.compilerNode;
   const classDecl = findExportedClassDeclaration(sf, entityClassName);
   if (!classDecl) {
     throw new Error(
