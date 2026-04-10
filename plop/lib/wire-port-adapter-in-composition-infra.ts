@@ -46,7 +46,7 @@ function buildPortTypeImportLine(adapterFileAbsPath: string, portInterfaceName: 
  * @param {string} portInterfaceName
  * @param {string} adapterClassName
  * @param {boolean} needsConstructorStub
- * @returns {ts.MethodDeclaration}
+ * @returns {string}
  */
 function createPrivateGetterMethod(
   getterName: string,
@@ -55,49 +55,19 @@ function createPrivateGetterMethod(
   adapterClassName: string,
   needsConstructorStub: boolean
 ) {
-  const newExpr = ts.factory.createNewExpression(
-    ts.factory.createIdentifier(adapterClassName),
-    undefined,
-    []
-  );
-  let ret = ts.factory.createReturnStatement(newExpr);
-  if (needsConstructorStub) {
-    ret = ts.addSyntheticLeadingComment(
-      ret,
-      ts.SyntaxKind.SingleLineCommentTrivia,
-      ` FIXME: pass the adapter's required constructor deps (e.g. from RequestContext and/or app-scoped fields on this provider). TypeScript should error until this is fixed.`,
-      true
-    );
-  }
-  return ts.factory.createMethodDeclaration(
-    [ts.factory.createModifier(ts.SyntaxKind.PrivateKeyword)],
-    undefined,
-    ts.factory.createIdentifier(getterName),
-    undefined,
-    undefined,
-    [
-      ts.factory.createParameterDeclaration(
-        undefined,
-        undefined,
-        ctxParamName,
-        undefined,
-        ts.factory.createTypeReferenceNode(
-          ts.factory.createIdentifier("RequestContext"),
-          undefined
-        ),
-        undefined
-      ),
-    ],
-    ts.factory.createTypeReferenceNode(ts.factory.createIdentifier(portInterfaceName), undefined),
-    ts.factory.createBlock([ret], true)
-  );
+  const fixme = needsConstructorStub
+    ? `\n    // FIXME: pass the adapter's required constructor deps (e.g. from RequestContext and/or app-scoped fields on this provider). TypeScript should error until this is fixed.`
+    : "";
+  return `private ${getterName}(${ctxParamName}: RequestContext): ${portInterfaceName} {${fixme}
+    return new ${adapterClassName}();
+  }`;
 }
 /**
  * @param {string} propName
  * @param {string} portInterfaceName
  * @param {string} adapterClassName
  * @param {boolean} needsConstructorStub
- * @returns {ts.PropertyDeclaration}
+ * @returns {string}
  */
 function createAppScopedAdapterProperty(
   propName: string,
@@ -105,25 +75,10 @@ function createAppScopedAdapterProperty(
   adapterClassName: string,
   needsConstructorStub: boolean
 ) {
-  let decl = ts.factory.createPropertyDeclaration(
-    [
-      ts.factory.createModifier(ts.SyntaxKind.PrivateKeyword),
-      ts.factory.createModifier(ts.SyntaxKind.ReadonlyKeyword),
-    ],
-    ts.factory.createIdentifier(propName),
-    undefined,
-    ts.factory.createTypeReferenceNode(ts.factory.createIdentifier(portInterfaceName), undefined),
-    ts.factory.createNewExpression(ts.factory.createIdentifier(adapterClassName), undefined, [])
-  );
-  if (needsConstructorStub) {
-    decl = ts.addSyntheticLeadingComment(
-      decl,
-      ts.SyntaxKind.SingleLineCommentTrivia,
-      ` FIXME: composition-wire-port-adapter — \`new ${adapterClassName}()\` in this field initializer is incomplete; pass the adapter's required constructor deps (e.g. from other app-scoped fields on this provider). TypeScript should error until this is fixed.`,
-      true
-    );
-  }
-  return decl;
+  const fixme = needsConstructorStub
+    ? `\n  // FIXME: composition-wire-port-adapter — \`new ${adapterClassName}()\` in this field initializer is incomplete; pass the adapter's required constructor deps (e.g. from other app-scoped fields on this provider). TypeScript should error until this is fixed.\n`
+    : "\n";
+  return `${fixme}  private readonly ${propName}: ${portInterfaceName} = new ${adapterClassName}();`;
 }
 /**
  * @param {string} compositionInfrastructurePath
@@ -150,11 +105,11 @@ function wirePortAdapterIntoCompositionInfrastructure(
   fs.writeFileSync(compositionInfrastructurePath, text, "utf8");
   const ast = loadCompositionInfrastructureAst(compositionInfrastructurePath);
   const getterName = `get${toPascalCase(propName)}`;
-  assertNoConflictingMembers(ast.providerClass.members, [propName, getterName]);
+  assertNoConflictingMembers(ast.providerClass.getMembers(), [propName, getterName]);
   assertNoReturnPropertyConflict(ast.returnObject, propName);
-  /** @type {ts.ClassElement} */
+  /** @type {string} */
   let insertedMember;
-  /** @type {ts.Expression} */
+  /** @type {string} */
   let valueExprForReturn;
   if (scope === "app") {
     insertedMember = createAppScopedAdapterProperty(
@@ -163,10 +118,7 @@ function wirePortAdapterIntoCompositionInfrastructure(
       adapterClassName,
       requiredConstructorParams > 0
     );
-    valueExprForReturn = ts.factory.createPropertyAccessExpression(
-      ts.factory.createThis(),
-      ts.factory.createIdentifier(propName)
-    );
+    valueExprForReturn = `this.${propName}`;
   } else {
     const needsStub = requiredConstructorParams > 0;
     insertedMember = createPrivateGetterMethod(
@@ -176,22 +128,12 @@ function wirePortAdapterIntoCompositionInfrastructure(
       adapterClassName,
       needsStub
     );
-    valueExprForReturn = ts.factory.createCallExpression(
-      ts.factory.createPropertyAccessExpression(
-        ts.factory.createThis(),
-        ts.factory.createIdentifier(getterName)
-      ),
-      undefined,
-      [ts.factory.createIdentifier(ast.ctxParamName)]
-    );
+    valueExprForReturn = `this.${getterName}(${ast.ctxParamName})`;
   }
   return printUpdatedCompositionInfrastructure({
     ...ast,
     insertedMembers: [insertedMember],
-    appendedProperty: ts.factory.createPropertyAssignment(
-      ts.factory.createIdentifier(propName),
-      valueExprForReturn
-    ),
+    appendedProperty: ts.makePropertyAssignmentText(propName, valueExprForReturn),
   });
 }
 /**

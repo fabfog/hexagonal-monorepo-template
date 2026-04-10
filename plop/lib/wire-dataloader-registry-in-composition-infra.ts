@@ -10,50 +10,13 @@ import {
 /**
  * @param {string} getterName
  * @param {string} ctxParamName
- * @returns {import('typescript').MethodDeclaration}
+ * @returns {string}
  */
 function createLoadersGetterMethod(getterName: string, ctxParamName: string) {
-  return ts.factory.createMethodDeclaration(
-    [ts.factory.createModifier(ts.SyntaxKind.PrivateKeyword)],
-    undefined,
-    ts.factory.createIdentifier(getterName),
-    undefined,
-    undefined,
-    [
-      ts.factory.createParameterDeclaration(
-        undefined,
-        undefined,
-        ctxParamName,
-        undefined,
-        ts.factory.createTypeReferenceNode(
-          ts.factory.createIdentifier("RequestContext"),
-          undefined
-        ),
-        undefined
-      ),
-    ],
-    ts.factory.createTypeReferenceNode(
-      ts.factory.createIdentifier("DataLoaderRegistry"),
-      undefined
-    ),
-    ts.factory.createBlock(
-      [
-        ts.addSyntheticLeadingComment(
-          ts.factory.createReturnStatement(
-            ts.factory.createCallExpression(
-              ts.factory.createIdentifier("createDataLoaderRegistry"),
-              undefined,
-              []
-            )
-          ),
-          ts.SyntaxKind.SingleLineCommentTrivia,
-          " Request-scoped registry: keep DataLoader cache bounded to the current request lifecycle.",
-          true
-        ),
-      ],
-      true
-    )
-  );
+  return `private ${getterName}(${ctxParamName}: RequestContext): DataLoaderRegistry {
+    // Request-scoped registry: keep DataLoader cache bounded to the current request lifecycle.
+    return createDataLoaderRegistry();
+  }`;
 }
 interface DataLoaderWireOpts {
   propName: string;
@@ -77,22 +40,15 @@ function wireDataLoaderRegistryIntoCompositionInfrastructure(
   text = appendImportsIfMissing(text, importLines);
   fs.writeFileSync(compositionInfrastructurePath, text, "utf8");
   const ast = loadCompositionInfrastructureAst(compositionInfrastructurePath);
-  assertNoConflictingMembers(ast.providerClass.members, [propName, getterName]);
+  assertNoConflictingMembers(ast.providerClass.getMembers(), [propName, getterName]);
   assertNoReturnPropertyConflict(ast.returnObject, propName);
   const getter = createLoadersGetterMethod(getterName, ast.ctxParamName);
   return printUpdatedCompositionInfrastructure({
     ...ast,
     insertedMembers: [getter],
-    appendedProperty: ts.factory.createPropertyAssignment(
-      ts.factory.createIdentifier(propName),
-      ts.factory.createCallExpression(
-        ts.factory.createPropertyAccessExpression(
-          ts.factory.createThis(),
-          ts.factory.createIdentifier(getterName)
-        ),
-        undefined,
-        [ts.factory.createIdentifier(ast.ctxParamName)]
-      )
+    appendedProperty: ts.makePropertyAssignmentText(
+      propName,
+      `this.${getterName}(${ast.ctxParamName})`
     ),
   });
 }
