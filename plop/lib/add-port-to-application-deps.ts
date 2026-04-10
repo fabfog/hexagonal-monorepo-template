@@ -1,10 +1,11 @@
 import fs from "node:fs";
 import path from "node:path";
-import ts from "typescript";
 import type { Dirent } from "node:fs";
 import type { Answers } from "inquirer";
+import type { InterfaceDeclaration, SourceFile } from "ts-morph";
 import { toKebabCase, toPascalCase, toCamelCase } from "./casing.ts";
 import { applicationPortsDir } from "./packages.ts";
+import { createPlopMorphProject } from "./ts-morph-project.ts";
 
 type ApplicationSliceKind = "use-case" | "flow";
 
@@ -68,54 +69,40 @@ function applicationSliceFilePath(
 function sliceDepsInterfaceName(sliceKind: string, sliceName: string) {
   return `${toPascalCase(sliceName)}${sliceFileSpec(sliceKind).depsInterfaceSuffix}`;
 }
-/**
- * @param {ts.SourceFile} sf
- * @param {string} interfaceName
- * @returns {ts.InterfaceDeclaration | undefined}
- */
-function findInterfaceDeclaration(sf: ts.SourceFile, interfaceName: string) {
-  let found: ts.InterfaceDeclaration | undefined;
-  function visit(node: ts.Node) {
-    if (ts.isInterfaceDeclaration(node) && node.name.text === interfaceName) {
-      if (found) {
-        throw new Error(
-          `Multiple interfaces named "${interfaceName}" in file; Plop expects a single declaration.`
-        );
-      }
-      found = node;
-    }
-    ts.forEachChild(node, visit);
+const morphProject = createPlopMorphProject({ useInMemoryFileSystem: true });
+
+function getInterfaceDeclarationOrThrow(
+  sf: SourceFile,
+  interfaceName: string
+): InterfaceDeclaration {
+  const matches = sf.getInterfaces().filter((decl) => decl.getName() === interfaceName);
+  if (matches.length === 0) {
+    throw new Error(`Could not find interface "${interfaceName}" in file.`);
   }
-  visit(sf);
-  return found;
-}
-/**
- * Character index of the `}` that closes the interface body (insert new members before this).
- * @param {ts.SourceFile} sf
- * @param {ts.InterfaceDeclaration} intf
- */
-function getInterfaceCloseBraceIndex(sf: ts.SourceFile, intf: ts.InterfaceDeclaration) {
-  for (const child of intf.getChildren(sf)) {
-    if (child.kind === ts.SyntaxKind.CloseBraceToken) {
-      return child.getStart(sf);
-    }
+  if (matches.length > 1) {
+    throw new Error(
+      `Multiple interfaces named "${interfaceName}" in file; Plop expects a single declaration.`
+    );
   }
-  throw new Error(`Could not find closing "}" for interface "${intf.name.text}".`);
+  return matches[0]!;
 }
-/**
- * @param {ts.SourceFile} sf
- * @param {ts.InterfaceDeclaration} intf
- */
-function inferIndentFromInterface(sf: ts.SourceFile, intf: ts.InterfaceDeclaration) {
-  for (const member of intf.members) {
-    if (!ts.isPropertySignature(member) || !ts.isIdentifier(member.name)) continue;
-    const full = sf.getFullText();
-    const nameStart = member.name.getStart(sf);
+
+function getInterfaceCloseBraceIndex(source: string, intf: InterfaceDeclaration) {
+  const closeIdx = source.lastIndexOf("}", intf.getEnd());
+  if (closeIdx === -1) {
+    throw new Error(`Could not find closing "}" for interface "${intf.getName()}".`);
+  }
+  return closeIdx;
+}
+
+function inferIndentFromInterface(source: string, intf: InterfaceDeclaration) {
+  for (const member of intf.getProperties()) {
+    const nameStart = member.getNameNode().getStart();
     let lineStart = nameStart;
-    while (lineStart > 0 && full[lineStart - 1] !== "\n") {
+    while (lineStart > 0 && source[lineStart - 1] !== "\n") {
       lineStart--;
     }
-    const prefix = full.slice(lineStart, nameStart);
+    const prefix = source.slice(lineStart, nameStart);
     if (/^\s*$/.test(prefix)) {
       return prefix;
     }
@@ -130,26 +117,21 @@ function inferIndentFromInterface(sf: ts.SourceFile, intf: ts.InterfaceDeclarati
  * @returns {{ body: string, closeIdx: number, properties: { name: string, type: string }[], indent: string }}
  */
 function parseDependenciesInterface(source: string, interfaceName: string) {
-  const fileName = "slice-deps.ts";
-  const sf = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
-  const intf = findInterfaceDeclaration(sf, interfaceName);
-  if (!intf) {
-    throw new Error(`Could not find interface "${interfaceName}" in file.`);
-  }
+  const sf = morphProject.createSourceFile("slice-deps.ts", source, { overwrite: true });
+  const intf = getInterfaceDeclarationOrThrow(sf, interfaceName);
   /** @type {{ name: string, type: string }[]} */
   const properties = [];
-  for (const member of intf.members) {
-    if (!ts.isPropertySignature(member)) continue;
-    if (!member.name || !ts.isIdentifier(member.name)) continue;
-    if (!member.type) continue;
+  for (const member of intf.getProperties()) {
+    const typeNode = member.getTypeNode();
+    if (!typeNode) continue;
     properties.push({
-      name: member.name.text,
-      type: member.type.getText(sf).trim(),
+      name: member.getName(),
+      type: typeNode.getText().trim(),
     });
   }
-  const closeIdx = getInterfaceCloseBraceIndex(sf, intf);
-  const indent = inferIndentFromInterface(sf, intf);
-  const body = source.slice(intf.members.pos, closeIdx);
+  const closeIdx = getInterfaceCloseBraceIndex(source, intf);
+  const indent = inferIndentFromInterface(source, intf);
+  const body = source.slice(intf.getStart(), closeIdx);
   return { body, closeIdx, properties, indent };
 }
 function insertAfterLastImport(src: string, importLine: string) {

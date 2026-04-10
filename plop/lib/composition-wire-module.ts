@@ -1,39 +1,47 @@
 import fs from "node:fs";
 import path from "node:path";
-import ts from "typescript";
+import { Node } from "ts-morph";
 import { toCamelCase } from "./casing.ts";
 import { appendImportsIfMissing } from "./module-wire-ast.ts";
+import { createPlopMorphProject } from "./ts-morph-project.ts";
 /**
  * @param {string} absModulePath
  * @returns {string} exported class name ending in Module
  */
 function parseExportedModuleClassName(absModulePath: string) {
   const text = fs.readFileSync(absModulePath, "utf8");
-  const sf = ts.createSourceFile(
-    absModulePath,
-    text,
-    ts.ScriptTarget.Latest,
-    true,
-    ts.ScriptKind.TS
-  );
-  /** @type {string | undefined} */
-  let found;
-  function visit(node: ts.Node) {
-    if (
-      ts.isClassDeclaration(node) &&
-      node.name &&
-      node.name.text.endsWith("Module") &&
-      node.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)
-    ) {
-      found = node.name.text;
-    }
-    ts.forEachChild(node, visit);
-  }
-  visit(sf);
-  if (!found) {
+  const project = createPlopMorphProject({ useInMemoryFileSystem: true });
+  const sf = project.createSourceFile(absModulePath, text, { overwrite: true });
+  const found = sf
+    .getClasses()
+    .find((decl) => decl.isExported() && (decl.getName() ?? "").endsWith("Module"));
+  const className = found?.getName();
+  if (!className) {
     throw new Error(`No exported *Module class in ${absModulePath}`);
   }
-  return found;
+  return className;
+}
+/**
+ * @param {import("ts-morph").FunctionDeclaration} fn
+ * @returns {string}
+ */
+function findInfraVariableName(fn: import("ts-morph").FunctionDeclaration) {
+  const body = fn.getBodyOrThrow();
+  if (!Node.isBlock(body)) {
+    throw new Error("Expected get*Modules to have a block body.");
+  }
+  for (const st of body.getStatements()) {
+    if (!Node.isVariableStatement(st)) continue;
+    for (const decl of st.getDeclarationList().getDeclarations()) {
+      const initializerText = decl.getInitializer()?.getText() ?? "";
+      if (initializerText.includes("infrastructureProvider.getForContext")) {
+        return decl.getName();
+      }
+    }
+  }
+  throw new Error(
+    "Could not find `const <name> = infrastructureProvider.getForContext(ctx)` in get*Modules body."
+  );
 }
 /**
  * @param {string} moduleFileName e.g. support-inbox.module.ts
@@ -45,46 +53,10 @@ function moduleFileBaseKebab(moduleFileName: string) {
   }
   return moduleFileName.replace(/\.module\.ts$/, "");
 }
-/**
- * @param {ts.Block} body
- * @param {ts.SourceFile} sf
- * @returns {string}
- */
-function findInfraVariableName(body: ts.Block, sf: ts.SourceFile) {
-  for (const st of body.statements) {
-    if (!ts.isVariableStatement(st)) continue;
-    for (const decl of st.declarationList.declarations) {
-      if (!ts.isIdentifier(decl.name) || !decl.initializer) continue;
-      const initText = decl.initializer.getText(sf);
-      if (initText.includes("infrastructureProvider.getForContext")) {
-        return decl.name.text;
-      }
-    }
-  }
-  throw new Error(
-    "Could not find `const <name> = infrastructureProvider.getForContext(ctx)` in get*Modules body."
-  );
-}
-/**
- * @param {ts.SourceFile} sf
- * @returns {ts.FunctionDeclaration | undefined}
- */
-function findGetModulesFunction(sf: ts.SourceFile) {
-  let found: ts.FunctionDeclaration | undefined;
-  function visit(node: ts.Node) {
-    if (
-      ts.isFunctionDeclaration(node) &&
-      node.name &&
-      /^get\w+Modules$/.test(node.name.text) &&
-      node.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)
-    ) {
-      found = node;
-      return;
-    }
-    ts.forEachChild(node, visit);
-  }
-  visit(sf);
-  return found;
+function findGetModulesFunction(sf: import("ts-morph").SourceFile) {
+  return sf
+    .getFunctions()
+    .find((fn) => fn.isExported() && !!fn.getName() && /^get\w+Modules$/.test(fn.getName()!));
 }
 /**
  * @param {string} compositionIndexPath
@@ -126,76 +98,35 @@ function wireApplicationModuleIntoCompositionIndex(
     throw new Error(`${className} already appears wired in ${compositionIndexPath}`);
   }
   text = appendImportsIfMissing(text, [importLine]);
-  const sf = ts.createSourceFile(
-    compositionIndexPath,
-    text,
-    ts.ScriptTarget.Latest,
-    true,
-    ts.ScriptKind.TS
-  );
+  const project = createPlopMorphProject({ useInMemoryFileSystem: true });
+  const sf = project.createSourceFile(compositionIndexPath, text, { overwrite: true });
   const fn = findGetModulesFunction(sf);
-  if (!fn || !fn.body || !ts.isBlock(fn.body)) {
+  const fnBodyCandidate = fn?.getBody();
+  const fnBody = fnBodyCandidate && Node.isBlock(fnBodyCandidate) ? fnBodyCandidate : undefined;
+  if (!fn || !fnBody) {
     throw new Error(
       `No exported function get*Modules with a block body in ${compositionIndexPath}`
     );
   }
-  const fnBody = fn.body;
-  const infraVar = findInfraVariableName(fnBody, sf);
-  /** @type {ts.ReturnStatement | undefined} */
-  let retStmt;
-  for (const st of fnBody.statements) {
-    if (ts.isReturnStatement(st)) retStmt = st;
-  }
-  if (!retStmt?.expression || !ts.isObjectLiteralExpression(retStmt.expression)) {
+  const infraVar = findInfraVariableName(fn);
+  const returnStatements = fnBody.getStatements().filter(Node.isReturnStatement);
+  const retStmt = returnStatements.at(-1);
+  const retExpr = retStmt?.getExpression();
+  if (!retExpr || !Node.isObjectLiteralExpression(retExpr)) {
     throw new Error(
-      `Expected a single return with an object literal in ${fn.name?.text ?? "get*Modules"}`
+      `Expected a single return with an object literal in ${fn.getName() ?? "get*Modules"}`
     );
   }
-  const obj = retStmt.expression;
-  for (const p of obj.properties) {
-    if (ts.isPropertyAssignment(p) && ts.isIdentifier(p.name) && p.name.text === propertyKey) {
+  for (const p of retExpr.getProperties()) {
+    if (Node.isPropertyAssignment(p) && p.getName() === propertyKey) {
       throw new Error(`Return object already has property "${propertyKey}"`);
     }
   }
-  const newProp = ts.factory.createPropertyAssignment(
-    ts.factory.createIdentifier(propertyKey),
-    ts.factory.createNewExpression(ts.factory.createIdentifier(className), undefined, [
-      ts.factory.createIdentifier(infraVar),
-    ])
-  );
-  const newObj = ts.factory.updateObjectLiteralExpression(obj, [...obj.properties, newProp]);
-  const newRet = ts.factory.updateReturnStatement(retStmt, newObj);
-  const retIndex = fnBody.statements.indexOf(retStmt);
-  const newStmts = fnBody.statements.map((s: ts.Statement, i: number) =>
-    i === retIndex ? newRet : s
-  );
-  const newBody = ts.factory.updateBlock(fnBody, newStmts);
-  const newFn = ts.factory.updateFunctionDeclaration(
-    fn,
-    fn.modifiers,
-    fn.asteriskToken,
-    fn.name,
-    fn.typeParameters,
-    fn.parameters,
-    fn.type,
-    newBody
-  );
-  const newStatements = sf.statements.map((s: ts.Statement) => (s === fn ? newFn : s));
-  const transformer: ts.TransformerFactory<ts.SourceFile> = (context) => (sourceFile) => {
-    if (sourceFile !== sf) {
-      return sourceFile;
-    }
-    return context.factory.updateSourceFile(sourceFile, newStatements);
-  };
-  const result = ts.transform(sf, [transformer]);
-  const transformed = result.transformed[0];
-  result.dispose();
-  const printer = ts.createPrinter({
-    newLine: ts.NewLineKind.LineFeed,
-    removeComments: false,
+  retExpr.addPropertyAssignment({
+    name: propertyKey,
+    initializer: `new ${className}(${infraVar})`,
   });
-  const out = transformed ?? sf;
-  return `${printer.printFile(out).replace(/\n+$/, "")}\n`;
+  return `${sf.getFullText().replace(/\n+$/, "")}\n`;
 }
 /**
  * Ensure composition package.json depends on @application/<pkg> workspace:*.
