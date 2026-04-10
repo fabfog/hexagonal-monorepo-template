@@ -1,6 +1,11 @@
 import fs from "node:fs";
-import ts from "typescript";
+import type { ClassDeclaration, SourceFile } from "ts-morph";
+import { Node, SyntaxKind } from "ts-morph";
 import { toKebabCase, toCamelCase } from "./casing.ts";
+import { createPlopMorphProject } from "./ts-morph-project.ts";
+
+const morphProject = createPlopMorphProject({ useInMemoryFileSystem: true });
+
 /** Property types that are a single identifier (e.g. `ClockPort`) — used to pull `import type` from wired files. */
 const SINGLE_IDENTIFIER_TYPE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 /**
@@ -30,61 +35,32 @@ function typeIdentifiersNeededForSpec(spec: ReturnType<typeof extractWireSpec>) 
   }
   return ids;
 }
-/**
- * @param {ts.SourceFile} sf
- * @param {string} className
- * @returns {ts.ClassDeclaration | undefined}
- */
-function findExportedClassDeclaration(sf: ts.SourceFile, className: string) {
-  for (const stmt of sf.statements) {
-    if (
-      ts.isClassDeclaration(stmt) &&
-      stmt.name?.text === className &&
-      stmt.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)
-    ) {
-      return stmt;
-    }
-  }
-  return undefined;
+function findExportedClassDeclaration(sf: SourceFile, className: string) {
+  return sf.getClasses().find((decl) => decl.isExported() && decl.getName() === className);
 }
-/**
- * @param {ts.ClassDeclaration} classDecl
- * @param {ts.SourceFile} sf
- * @returns {string | null}
- */
-function getConstructorFirstParameterTypeName(classDecl: ts.ClassDeclaration, _sf: ts.SourceFile) {
-  for (const member of classDecl.members) {
-    if (!ts.isConstructorDeclaration(member)) continue;
-    const [param] = member.parameters;
-    if (!param?.type) return null;
-    if (ts.isTypeReferenceNode(param.type) && ts.isIdentifier(param.type.typeName)) {
-      return param.type.typeName.text;
-    }
-    return null;
-  }
+function getConstructorFirstParameterTypeName(classDecl: ClassDeclaration) {
+  const ctor = classDecl.getConstructors()[0];
+  const p0 = ctor?.getParameters()[0];
+  const tn = p0?.getTypeNode();
+  if (!tn || !Node.isTypeReference(tn)) return null;
+  const typeName = tn.getTypeName();
+  if (Node.isIdentifier(typeName)) return typeName.getText();
   return null;
 }
-/**
- * @param {ts.SourceFile} sf
- * @param {string} interfaceName
- * @returns {{ name: string, typeText: string }[]}
- */
-function getInterfacePropertySignatures(sf: ts.SourceFile, interfaceName: string) {
+function getInterfacePropertySignatures(sf: SourceFile, interfaceName: string) {
   const out: { name: string; typeText: string }[] = [];
-  function visit(node: ts.Node) {
-    if (ts.isInterfaceDeclaration(node) && node.name.text === interfaceName) {
-      for (const member of node.members) {
-        if (!ts.isPropertySignature(member)) continue;
-        if (!member.name || !ts.isIdentifier(member.name) || !member.type) continue;
-        out.push({
-          name: member.name.text,
-          typeText: member.type.getText(sf),
-        });
-      }
+  sf.forEachDescendant((node) => {
+    if (!Node.isInterfaceDeclaration(node) || node.getName() !== interfaceName) return;
+    for (const member of node.getMembers()) {
+      if (!Node.isPropertySignature(member)) continue;
+      const typeNode = member.getTypeNode();
+      if (!typeNode) continue;
+      out.push({
+        name: member.getName(),
+        typeText: typeNode.getText().trim(),
+      });
     }
-    ts.forEachChild(node, visit);
-  }
-  visit(sf);
+  });
   return out;
 }
 /**
@@ -97,20 +73,14 @@ function extractWireSpec(absPath: string, kind: "use-case" | "flow", pascalBase:
     throw new Error(`Expected file at ${absPath}`);
   }
   const sourceText = fs.readFileSync(absPath, "utf8");
-  const sf = ts.createSourceFile(
-    absPath,
-    sourceText,
-    ts.ScriptTarget.Latest,
-    true,
-    ts.ScriptKind.TS
-  );
+  const sf = morphProject.createSourceFile(absPath, sourceText, { overwrite: true });
   const suffix = kind === "use-case" ? "UseCase" : "Flow";
   const className = `${pascalBase}${suffix}`;
   const classDecl = findExportedClassDeclaration(sf, className);
   if (!classDecl) {
     throw new Error(`No exported class "${className}" in ${absPath}`);
   }
-  const depsInterfaceName = getConstructorFirstParameterTypeName(classDecl, sf);
+  const depsInterfaceName = getConstructorFirstParameterTypeName(classDecl);
   if (!depsInterfaceName) {
     throw new Error(
       `Could not read constructor deps type (expected first parameter: TypeReference) for "${className}" in ${absPath}`
@@ -141,24 +111,17 @@ type WireSpec = ReturnType<typeof extractWireSpec>;
  */
 function collectTypeBindingImportsFromFile(absPath: string) {
   const sourceText = fs.readFileSync(absPath, "utf8");
-  const sf = ts.createSourceFile(
-    absPath,
-    sourceText,
-    ts.ScriptTarget.Latest,
-    true,
-    ts.ScriptKind.TS
-  );
+  const sf = morphProject.createSourceFile(absPath, sourceText, { overwrite: true });
   const map = new Map<string, { specifier: string; isTypeOnly: boolean }>();
-  for (const stmt of sf.statements) {
-    if (!ts.isImportDeclaration(stmt)) continue;
-    if (!ts.isStringLiteral(stmt.moduleSpecifier)) continue;
-    const specifier = stmt.moduleSpecifier.text;
-    const clause = stmt.importClause;
-    if (!clause?.namedBindings || !ts.isNamedImports(clause.namedBindings)) continue;
-    const clauseTypeOnly = Boolean(clause.isTypeOnly);
-    for (const el of clause.namedBindings.elements) {
-      const bindingName = el.name.text;
-      const typeOnly = clauseTypeOnly || Boolean(el.isTypeOnly);
+  for (const decl of sf.getImportDeclarations()) {
+    const specifier = decl.getModuleSpecifierValue();
+    if (!specifier) continue;
+    const named = decl.getNamedImports();
+    if (named.length === 0) continue;
+    const clauseTypeOnly = decl.isTypeOnly();
+    for (const el of named) {
+      const bindingName = el.getName();
+      const typeOnly = clauseTypeOnly || el.isTypeOnly();
       if (!typeOnly) continue;
       const prev = map.get(bindingName);
       if (prev && prev.specifier !== specifier) {
@@ -224,9 +187,9 @@ function formatTypeImportLines(
     bySpecifier.set(hit.specifier, list);
   }
   return [...bySpecifier.entries()]
-    .sort(([a]: [string, string[]], [b]: [string, string[]]) => a.localeCompare(b))
-    .map(([spec, names]: [string, string[]]) => {
-      const sorted = [...new Set(names)].sort((a: string, b: string) => a.localeCompare(b));
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([spec, names]) => {
+      const sorted = [...new Set(names)].sort((a, b) => a.localeCompare(b));
       return `import type { ${sorted.join(", ")} } from "${spec}";`;
     });
 }
@@ -247,8 +210,8 @@ function mergeInfraProperties(specs: WireSpec[]) {
     }
   }
   return [...map.entries()]
-    .sort(([a]: [string, string], [b]: [string, string]) => a.localeCompare(b))
-    .map(([name, typeText]: [string, string]) => ({ name, typeText }));
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([name, typeText]) => ({ name, typeText }));
 }
 /**
  * @param {ReturnType<typeof extractWireSpec>} spec
@@ -351,57 +314,29 @@ function indexOfMatchingBrace(text: string, openBraceIdx: number) {
   }
   return -1;
 }
-/**
- * @param {ts.SourceFile} sf
- * @returns {ts.ClassDeclaration | undefined}
- */
-function findExportedModuleClass(sf: ts.SourceFile) {
-  for (const stmt of sf.statements) {
-    if (
-      ts.isClassDeclaration(stmt) &&
-      stmt.name?.text.endsWith("Module") &&
-      stmt.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)
-    ) {
-      return stmt;
-    }
-  }
-  return undefined;
+function findExportedModuleClass(sf: SourceFile) {
+  return sf
+    .getClasses()
+    .find((decl) => decl.isExported() && (decl.getName() ?? "").endsWith("Module"));
 }
-/**
- * @param {ts.SourceFile} sf
- * @param {string} name
- * @returns {ts.InterfaceDeclaration | undefined}
- */
-function findExportedInterfaceDeclaration(sf: ts.SourceFile, name: string) {
-  for (const stmt of sf.statements) {
-    if (
-      ts.isInterfaceDeclaration(stmt) &&
-      stmt.name.text === name &&
-      stmt.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)
-    ) {
-      return stmt;
-    }
-  }
-  return undefined;
+function findExportedInterfaceDeclaration(sf: SourceFile, name: string) {
+  return sf.getInterfaces().find((decl) => decl.isExported() && decl.getName() === name);
 }
-/**
- * @param {ts.ClassDeclaration} cls
- */
-function collectSliceClassNamesFromMethodBodies(cls: ts.ClassDeclaration) {
-  /** @type {Set<string>} */
-  const out = new Set();
-  for (const m of cls.members) {
-    if (!ts.isMethodDeclaration(m) || !m.body) continue;
-    function visit(node: ts.Node) {
-      if (ts.isNewExpression(node) && ts.isIdentifier(node.expression)) {
-        const tn = node.expression.text;
-        if (tn.endsWith("UseCase") || tn.endsWith("Flow")) {
-          out.add(tn);
-        }
+function collectSliceClassNamesFromMethodBodies(cls: ClassDeclaration) {
+  const out = new Set<string>();
+  for (const m of cls.getMembers()) {
+    if (!Node.isMethodDeclaration(m)) continue;
+    const body = m.getBody();
+    if (!body) continue;
+    body.forEachDescendant((node) => {
+      if (!Node.isNewExpression(node)) return;
+      const expr = node.getExpression();
+      if (!Node.isIdentifier(expr)) return;
+      const tn = expr.getText();
+      if (tn.endsWith("UseCase") || tn.endsWith("Flow")) {
+        out.add(tn);
       }
-      ts.forEachChild(node, visit);
-    }
-    visit(m.body);
+    });
   }
   return out;
 }
@@ -415,58 +350,48 @@ function getWiredSliceClassNamesFromModule(absPath: string) {
     return new Set();
   }
   const text = fs.readFileSync(absPath, "utf8");
-  const sf = ts.createSourceFile(absPath, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+  const sf = morphProject.createSourceFile(absPath, text, { overwrite: true });
   const cls = findExportedModuleClass(sf);
   if (!cls) {
     return new Set();
   }
-  /** @type {Set<string>} */
   const out = collectSliceClassNamesFromMethodBodies(cls);
-  for (const m of cls.members) {
-    if (!ts.isPropertyDeclaration(m)) continue;
-    const flags = ts.getCombinedModifierFlags(m);
-    const isPublic = (flags & ts.ModifierFlags.Public) !== 0;
-    const isReadonly = (flags & ts.ModifierFlags.Readonly) !== 0;
-    if (!isPublic || !isReadonly) continue;
-    if (!m.type || !ts.isTypeReferenceNode(m.type) || !ts.isIdentifier(m.type.typeName)) continue;
-    const tn = m.type.typeName.text;
+  for (const m of cls.getMembers()) {
+    if (!Node.isPropertyDeclaration(m)) continue;
+    if (!m.hasModifier(SyntaxKind.PublicKeyword)) continue;
+    if (!m.hasModifier(SyntaxKind.ReadonlyKeyword)) continue;
+    const typeNode = m.getTypeNode();
+    if (!typeNode || !Node.isTypeReference(typeNode)) continue;
+    const typeName = typeNode.getTypeName();
+    if (!Node.isIdentifier(typeName)) continue;
+    const tn = typeName.getText();
     if (tn.endsWith("UseCase") || tn.endsWith("Flow")) {
       out.add(tn);
     }
   }
   return out;
 }
-/**
- * @param {ts.ClassDeclaration} cls
- */
-function moduleUsesLegacyPublicSliceFields(cls: ts.ClassDeclaration) {
-  for (const m of cls.members) {
-    if (!ts.isPropertyDeclaration(m)) continue;
-    const flags = ts.getCombinedModifierFlags(m);
-    const isPublic = (flags & ts.ModifierFlags.Public) !== 0;
-    const isReadonly = (flags & ts.ModifierFlags.Readonly) !== 0;
-    if (!isPublic || !isReadonly) continue;
-    if (!m.type || !ts.isTypeReferenceNode(m.type) || !ts.isIdentifier(m.type.typeName)) continue;
-    const tn = m.type.typeName.text;
+function moduleUsesLegacyPublicSliceFields(cls: ClassDeclaration) {
+  for (const m of cls.getMembers()) {
+    if (!Node.isPropertyDeclaration(m)) continue;
+    if (!m.hasModifier(SyntaxKind.PublicKeyword)) continue;
+    if (!m.hasModifier(SyntaxKind.ReadonlyKeyword)) continue;
+    const typeNode = m.getTypeNode();
+    if (!typeNode || !Node.isTypeReference(typeNode)) continue;
+    const typeName = typeNode.getTypeName();
+    if (!Node.isIdentifier(typeName)) continue;
+    const tn = typeName.getText();
     if (tn.endsWith("UseCase") || tn.endsWith("Flow")) {
       return true;
     }
   }
   return false;
 }
-/**
- * @param {ts.SourceFile} sf
- * @returns {Set<string>}
- */
-function collectAllImportedBindingNames(sf: ts.SourceFile) {
-  /** @type {Set<string>} */
-  const names = new Set();
-  for (const stmt of sf.statements) {
-    if (!ts.isImportDeclaration(stmt)) continue;
-    const clause = stmt.importClause;
-    if (!clause?.namedBindings || !ts.isNamedImports(clause.namedBindings)) continue;
-    for (const el of clause.namedBindings.elements) {
-      names.add(el.name.text);
+function collectAllImportedBindingNames(sf: SourceFile) {
+  const names = new Set<string>();
+  for (const decl of sf.getImportDeclarations()) {
+    for (const el of decl.getNamedImports()) {
+      names.add(el.getName());
     }
   }
   return names;
@@ -494,18 +419,9 @@ function extractBindingsFromImportLine(line: string) {
     })
     .filter(Boolean);
 }
-/**
- * @param {ts.SourceFile} sf
- * @returns {number}
- */
-function lastImportEndIndex(sf: ts.SourceFile) {
-  let end = 0;
-  for (const stmt of sf.statements) {
-    if (ts.isImportDeclaration(stmt)) {
-      end = stmt.getEnd();
-    }
-  }
-  return end;
+function lastImportEndIndex(sf: SourceFile) {
+  const imports = sf.getImportDeclarations();
+  return imports.length > 0 ? imports[imports.length - 1]!.getEnd() : 0;
 }
 /**
  * @param {string} text
@@ -515,16 +431,9 @@ function appendImportsIfMissing(text: string, lines: string[]) {
   if (!lines.length) {
     return text;
   }
-  const sf = ts.createSourceFile(
-    "_module.ts",
-    text,
-    ts.ScriptTarget.Latest,
-    true,
-    ts.ScriptKind.TS
-  );
+  const sf = morphProject.createSourceFile("_module.ts", text, { overwrite: true });
   const names = collectAllImportedBindingNames(sf);
-  /** @type {string[]} */
-  const toAdd = [];
+  const toAdd: string[] = [];
   for (const line of lines) {
     const bindings = extractBindingsFromImportLine(line);
     if (!bindings.length) {
@@ -551,15 +460,9 @@ function appendImportsIfMissing(text: string, lines: string[]) {
   }
   return text.slice(0, end) + block + rest;
 }
-/**
- * @param {string} text
- * @param {ts.SourceFile} sf
- * @param {string} ifaceName
- * @param {{ name: string, typeText: string }[]} newProps
- */
 function appendInfraProperties(
   text: string,
-  sf: ts.SourceFile,
+  sf: SourceFile,
   ifaceName: string,
   newProps: { name: string; typeText: string }[]
 ) {
@@ -571,8 +474,9 @@ function appendInfraProperties(
     throw new Error(`Could not find export interface ${ifaceName} in module file.`);
   }
   const block = newProps.map((p) => `  ${p.name}: ${p.typeText};`).join("\n");
-  if (iface.members.length === 0) {
-    const openBrace = text.indexOf("{", iface.name.getEnd());
+  const props = iface.getMembers().filter(Node.isPropertySignature);
+  if (props.length === 0) {
+    const openBrace = text.indexOf("{", iface.getNameNode().getEnd());
     if (openBrace === -1) {
       throw new Error(`Could not find opening "{" for ${ifaceName}.`);
     }
@@ -582,20 +486,20 @@ function appendInfraProperties(
     }
     return text.slice(0, openBrace + 1) + `\n${block}\n` + text.slice(closeBrace);
   }
-  const last = iface.members[iface.members.length - 1]!;
+  const last = props[props.length - 1]!;
   const pos = last.getEnd();
   return text.slice(0, pos) + `\n${block}` + text.slice(pos);
 }
 /**
  * Append new slice getters immediately before the class closing `}` (after constructor and any existing members).
  * @param {string} text
- * @param {ts.SourceFile} sf
+ * @param {SourceFile} sf
  * @param {string} modulePascal
  * @param {ReturnType<typeof extractWireSpec>[]} toWire
  */
 function appendModuleGetterMethodsBeforeClassClose(
   text: string,
-  sf: ts.SourceFile,
+  sf: SourceFile,
   modulePascal: string,
   toWire: WireSpec[]
 ) {
@@ -608,9 +512,9 @@ function appendModuleGetterMethodsBeforeClassClose(
     .sort((a: WireSpec, b: WireSpec) => a.fieldName.localeCompare(b.fieldName))
     .map((s: WireSpec) => emitSliceGetter(s))
     .join("\n\n");
-  for (const child of cls.getChildren(sf)) {
-    if (child.kind === ts.SyntaxKind.CloseBraceToken) {
-      const closeStart = child.getStart(sf);
+  for (const child of cls.getChildren()) {
+    if (child.getKind() === SyntaxKind.CloseBraceToken) {
+      const closeStart = child.getStart();
       return `${text.slice(0, closeStart)}\n${getters}\n${text.slice(closeStart)}`;
     }
   }
@@ -619,32 +523,36 @@ function appendModuleGetterMethodsBeforeClassClose(
 /**
  * Promote `constructor(infra: InfraName)` to `constructor(private readonly infra: InfraName)` when needed.
  * @param {string} text
- * @param {ts.SourceFile} sf
+ * @param {SourceFile} sf
  * @param {string} modulePascal
  * @param {string} infraName
  */
 function ensureConstructorPrivateReadonlyInfra(
   text: string,
-  sf: ts.SourceFile,
+  sf: SourceFile,
   modulePascal: string,
   infraName: string
 ) {
   const className = `${modulePascal}Module`;
   const cls = findExportedClassDeclaration(sf, className);
-  const ctor = cls?.members.find(ts.isConstructorDeclaration);
-  if (!ctor?.parameters.length) {
+  const ctor = cls?.getConstructors()[0];
+  if (!ctor) {
     return text;
   }
-  const p = ctor.parameters[0]!;
-  if (p.name.getText(sf) !== "infra") {
+  const params = ctor.getParameters();
+  if (params.length === 0) {
     return text;
   }
-  const hasPrivate = p.modifiers?.some((m) => m.kind === ts.SyntaxKind.PrivateKeyword) ?? false;
+  const p = params[0]!;
+  if (p.getName() !== "infra") {
+    return text;
+  }
+  const hasPrivate = p.hasModifier(SyntaxKind.PrivateKeyword);
   if (hasPrivate) {
     return text;
   }
-  const typeStr = p.type ? p.type.getText(sf) : infraName;
-  const start = p.getStart(sf);
+  const typeStr = p.getTypeNode()?.getText() ?? infraName;
+  const start = p.getStart();
   const end = p.getEnd();
   return `${text.slice(0, start)}private readonly infra: ${typeStr}${text.slice(end)}`;
 }
@@ -658,9 +566,9 @@ function wireAdditionalSlicesIntoModuleFile(absPath: string, newSpecs: WireSpec[
     throw new Error("No use-cases or flows selected to wire.");
   }
   let text = fs.readFileSync(absPath, "utf8");
-  const sf0 = ts.createSourceFile(absPath, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+  const sf0 = morphProject.createSourceFile(absPath, text, { overwrite: true });
   const moduleClass0 = findExportedModuleClass(sf0);
-  if (!moduleClass0?.name) {
+  if (!moduleClass0?.getName()) {
     throw new Error(`No exported *Module class found in ${absPath}`);
   }
   if (moduleUsesLegacyPublicSliceFields(moduleClass0)) {
@@ -668,7 +576,7 @@ function wireAdditionalSlicesIntoModuleFile(absPath: string, newSpecs: WireSpec[
       `Module ${absPath} still uses public readonly use-case/flow fields. Regenerate it with application-module (or migrate to camelCase slice methods) before using application-wire-module.`
     );
   }
-  const modulePascal = moduleClass0.name.text.replace(/Module$/, "");
+  const modulePascal = moduleClass0.getName()!.replace(/Module$/, "");
   const infraName = `${modulePascal}Infra`;
   const wired = getWiredSliceClassNamesFromModule(absPath);
   const toWire = newSpecs.filter((s) => !wired.has(s.className));
@@ -678,8 +586,9 @@ function wireAdditionalSlicesIntoModuleFile(absPath: string, newSpecs: WireSpec[
     );
   }
   const existingInfraProps = getInterfacePropertySignatures(sf0, infraName);
-  /** @type {Record<string, string>} */
-  const existingInfra = Object.fromEntries(existingInfraProps.map((p) => [p.name, p.typeText]));
+  const existingInfra: Record<string, string> = Object.fromEntries(
+    existingInfraProps.map((p) => [p.name, p.typeText])
+  );
   const newInfraMerged = mergeInfraProperties(toWire);
   for (const { name, typeText } of newInfraMerged) {
     if (existingInfra[name] !== undefined && existingInfra[name] !== typeText) {
@@ -703,11 +612,11 @@ function wireAdditionalSlicesIntoModuleFile(absPath: string, newSpecs: WireSpec[
     .sort((a: WireSpec, b: WireSpec) => a.className.localeCompare(b.className))
     .map((s: WireSpec) => `import { ${s.className} } from "${s.relImport}";`);
   text = appendImportsIfMissing(text, [...typeImportLines, ...classImportLines]);
-  let sf = ts.createSourceFile(absPath, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+  let sf = morphProject.createSourceFile(absPath, text, { overwrite: true });
   text = appendInfraProperties(text, sf, infraName, newInfraOnly);
-  sf = ts.createSourceFile(absPath, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+  sf = morphProject.createSourceFile(absPath, text, { overwrite: true });
   text = appendModuleGetterMethodsBeforeClassClose(text, sf, modulePascal, toWire);
-  sf = ts.createSourceFile(absPath, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+  sf = morphProject.createSourceFile(absPath, text, { overwrite: true });
   text = ensureConstructorPrivateReadonlyInfra(text, sf, modulePascal, infraName);
   fs.writeFileSync(absPath, `${text.replace(/\n+$/, "")}\n`, "utf8");
 }
